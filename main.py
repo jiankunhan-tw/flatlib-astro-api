@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query 
 from fastapi.responses import JSONResponse
 from flatlib.chart import Chart
 from flatlib.datetime import Datetime
@@ -12,38 +12,24 @@ app = FastAPI()
 def root():
     return {"message": "Flatlib API is running!"}
 
-def to_coord(val: str, is_lat=True):
-    try:
-        val = float(val)
-        deg = abs(int(val))
-        minutes = int(round((abs(val) - deg) * 60))
-        direction = (
-            'n' if is_lat and val >= 0 else
-            's' if is_lat and val < 0 else
-            'e' if not is_lat and val >= 0 else
-            'w'
-        )
-        return f"{deg}{direction}{minutes:02}"
-    except:
-        return val
-
 @app.get("/chart")
 def get_chart(
-    date: str = Query(...),
-    time: str = Query(...),
-    lat: str = Query(...),
-    lon: str = Query(...),
-    hsys: str = Query("wholeSigns")
+    date: str = Query(...),         # 格式：YYYY-MM-DD
+    time: str = Query(...),         # 格式：HH:MM
+    lat: str = Query(...),          # 緯度，例如 24.98
+    lon: str = Query(...),          # 經度，例如 121.54
+    hsys: str = Query("placidus")   # 宮位系統（預設 placidus，可用 wholeSigns 等）
 ):
     try:
+        # 建立時間與地點
         dt = Datetime(date, time, '+08:00')
-        lat_str = to_coord(lat, is_lat=True)
-        lon_str = to_coord(lon, is_lat=False)
-        pos = GeoPos(lat_str, lon_str)
+        pos = GeoPos(float(lat), float(lon))  # ✅ 改成 float 傳入，避免座標錯誤
 
+        # 建立星盤
         chart = Chart(dt, pos)
         chart.setHouses(hsys)
 
+        # 取得行星資料
         planets = {}
         for obj in [const.SUN, const.MOON, const.MERCURY, const.VENUS,
                     const.MARS, const.JUPITER, const.SATURN]:
@@ -58,6 +44,7 @@ def get_chart(
             except Exception as e:
                 planets[obj] = {"error": str(e)}
 
+        # 取得宮位資料
         houses = {}
         try:
             for i, house in enumerate(chart.houses, 1):
