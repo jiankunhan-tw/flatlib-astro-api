@@ -1,3 +1,3 @@
-flatlib==0.2.0
+flatlib @ https://raw.githubusercontent.com/jiankunhan-tw/flatlib-ephem-dist/main/flatlib-ephem-0.1.0.tar.gz
 fastapi
 uvicorn
