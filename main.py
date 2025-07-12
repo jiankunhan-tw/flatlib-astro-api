@@ -43,9 +43,9 @@ def get_chart(
         print("⚠️ [debug] lat_str =", lat_str)
         print("⚠️ [debug] lon_str =", lon_str)
 
-        # ➤ 建立星盤（使用 placidus 宮位制）
+        # ✅ 使用更穩定的整宮制（wholeSigns）
         pos = GeoPos(lat_str, lon_str)
-        chart = Chart(dt, pos, hsys='placidus')
+        chart = Chart(dt, pos, hsys='wholeSigns')
 
         from flatlib import const
         star_list = [
@@ -93,7 +93,7 @@ def get_chart(
 
         return {
             "status": "success",
-            "placidus": True,
+            "houseSystem": "wholeSigns",
             "tropical": True,
             "angles": angles,
             "houses": house_cusps,
