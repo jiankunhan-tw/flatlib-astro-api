@@ -43,11 +43,10 @@ def get_chart(
         print("⚠️ [debug] lat_str =", lat_str)
         print("⚠️ [debug] lon_str =", lon_str)
 
-        # ➤ 建立星盤（使用 placidus 宮位制，字串傳入）
+        # ➤ 建立星盤（使用 placidus 宮位制）
         pos = GeoPos(lat_str, lon_str)
         chart = Chart(dt, pos, hsys='placidus')
 
-        # ➤ 星體列表
         from flatlib import const
         star_list = [
             const.SUN, const.MOON, const.MERCURY, const.VENUS, const.MARS,
@@ -67,7 +66,6 @@ def get_chart(
             except Exception as inner:
                 planets[obj] = {"error": str(inner)}
 
-        # ➤ ASC / MC
         asc = chart.get(const.ASC)
         mc = chart.get(const.MC)
 
@@ -82,13 +80,16 @@ def get_chart(
             }
         }
 
-        # ➤ 12 宮宮頭（House cusps）
         house_cusps = {}
-        for i, house in enumerate(chart.houses, start=1):
-            house_cusps[f"House{i}"] = {
-                "sign": house.sign,
-                "lon": house.lon
-            }
+        try:
+            for i, house in enumerate(chart.houses, start=1):
+                house_cusps[f"House{i}"] = {
+                    "sign": house.sign,
+                    "lon": house.lon
+                }
+        except Exception as house_error:
+            print("⚠️ house parse error:", str(house_error))
+            house_cusps = {"error": str(house_error)}
 
         return {
             "status": "success",
