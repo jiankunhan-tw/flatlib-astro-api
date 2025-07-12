@@ -14,20 +14,20 @@ def root():
 
 @app.get("/chart")
 def get_chart(
-    date: str = Query(...),         # 格式：YYYY-MM-DD
-    time: str = Query(...),         # 格式：HH:MM 或 HH:MM:SS
-    lat: str = Query(...),          # 緯度
-    lon: str = Query(...),          # 經度
-    hsys: str = Query("placidus"),  # 宮位系統
-    ids: str = Query(None)          # 星體 ID（可選）
+    date: str = Query(...),         
+    time: str = Query(...),         
+    lat: float = Query(...),        # ✅ 改為 float，不再用 str
+    lon: float = Query(...),        # ✅ 改為 float，不再用 str
+    hsys: str = Query("placidus"),  
+    ids: str = Query(None)          
 ):
     try:
-        # ⛑️ 修正時間格式，補上秒數，避免 flatlib 當成 HH:MM:SS 解析失敗
+        # ⛑️ 若缺秒數則補 ":00"
         if len(time.split(":")) == 2:
             time += ":00"
 
         dt = Datetime(date, time, '+08:00')
-        pos = GeoPos(float(lat), float(lon))
+        pos = GeoPos(lat, lon)
         chart = Chart(dt, pos)
         chart.setHouses(hsys)
 
