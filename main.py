@@ -16,21 +16,21 @@ def root():
 def get_chart(
     date: str = Query(...),         # 格式：YYYY-MM-DD
     time: str = Query(...),         # 格式：HH:MM
-    lat: str = Query(...),          # 緯度
-    lon: str = Query(...),          # 經度
+    lat: str = Query(...),          # 緯度（需為字串）
+    lon: str = Query(...),          # 經度（需為字串）
     hsys: str = Query("placidus"),  # 宮位系統
-    ids: str = Query(None)          # 星體 ID（可選）
+    ids: str = Query(None)          # 星體 ID，可選
 ):
     try:
-        # 轉換時間與位置
-        dt = Datetime(date, time, '+08:00')
-        pos = GeoPos(float(lat), float(lon))  # 🔧 修正：強制轉為 float
+        # 強制轉字串避免浮點格式錯誤
+        lat = str(lat)
+        lon = str(lon)
 
-        # 建立命盤並設置宮位系統
+        dt = Datetime(date, time, '+08:00')
+        pos = GeoPos(lat, lon)
         chart = Chart(dt, pos)
         chart.setHouses(hsys)
 
-        # 可用星體列表
         allowed_ids = {
             'sun': const.SUN, 'moon': const.MOON,
             'mercury': const.MERCURY, 'venus': const.VENUS, 'mars': const.MARS,
@@ -38,14 +38,12 @@ def get_chart(
             'uranus': const.URANUS, 'neptune': const.NEPTUNE, 'pluto': const.PLUTO
         }
 
-        # 如果有指定要回傳哪些星體
         if ids:
             input_ids = [x.strip().lower() for x in ids.split(',')]
             obj_ids = [allowed_ids[i] for i in input_ids if i in allowed_ids]
         else:
             obj_ids = list(allowed_ids.values())
 
-        # 回傳星體資訊
         planets = {}
         for key in obj_ids:
             p = chart.get(key)
@@ -56,7 +54,6 @@ def get_chart(
                 "house": chart.houseOf(p)
             }
 
-        # 回傳宮位資訊
         houses = {
             f"House{i}": {
                 "sign": house.sign,
