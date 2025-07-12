@@ -41,6 +41,7 @@ def get_chart(
         pos = GeoPos(lat_str, lon_str)
         chart = Chart(dt, pos)
 
+        # 星體列表
         star_list = [
             const.SUN, const.MOON, const.MERCURY, const.VENUS, const.MARS,
             const.JUPITER, const.SATURN, const.URANUS, const.NEPTUNE, const.PLUTO
@@ -54,15 +55,40 @@ def get_chart(
                     "sign": planet.sign,
                     "lon": planet.lon,
                     "lat": planet.lat,
-                    "house": getattr(planet, 'house', None)
+                    "house": chart.houseOf(planet)
                 }
             except Exception as inner:
                 planets[obj] = {"error": str(inner)}
+
+        # ➤ 加入 ASC / MC
+        asc = chart.get(const.ASC)
+        mc = chart.get(const.MC)
+
+        angles = {
+            "ASC": {
+                "sign": asc.sign,
+                "lon": asc.lon
+            },
+            "MC": {
+                "sign": mc.sign,
+                "lon": mc.lon
+            }
+        }
+
+        # ➤ 加入 12 宮頭（House cusps）
+        house_cusps = {}
+        for i, house in enumerate(chart.houses, start=1):
+            house_cusps[f"House{i}"] = {
+                "sign": house.sign,
+                "lon": house.lon
+            }
 
         return {
             "status": "success",
             "placidus": True,
             "tropical": True,
+            "angles": angles,
+            "houses": house_cusps,
             "planets": planets
         }
 
