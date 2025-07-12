@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query 
+from fastapi import FastAPI, Query
 from flatlib.chart import Chart
 from flatlib.datetime import Datetime
 from flatlib.geopos import GeoPos
@@ -14,8 +14,8 @@ def root():
 def get_chart(
     date: str = Query(...),    # YYYY-MM-DD
     time: str = Query(...),    # HH:MM
-    lat: str = Query(...),     # 緯度，可為 float 或 '25n02'
-    lon: str = Query(...)      # 經度，可為 float 或 '121e31'
+    lat: str = Query(...),     # 緯度（可輸入 float 或如 25n02）
+    lon: str = Query(...)      # 經度（可輸入 float 或如 121e31）
 ):
     try:
         dt = Datetime(date, time, '+08:00')
@@ -60,7 +60,7 @@ def get_chart(
             except Exception as inner:
                 planets[obj] = {"error": str(inner)}
 
-        # ➤ 加入 ASC / MC
+        # ➤ ASC / MC
         asc = chart.get(const.ASC)
         mc = chart.get(const.MC)
 
@@ -75,7 +75,7 @@ def get_chart(
             }
         }
 
-        # ➤ 加入 12 宮頭（House cusps）
+        # ➤ 12 宮宮頭（House cusps）
         house_cusps = {}
         for i, house in enumerate(chart.houses, start=1):
             house_cusps[f"House{i}"] = {
