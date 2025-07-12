@@ -15,7 +15,7 @@ def root():
 @app.get("/chart")
 def get_chart(
     date: str = Query(...),         # 格式：YYYY-MM-DD
-    time: str = Query(...),         # 格式：HH:MM 或 HH:MM:SS
+    time: str = Query(...),         # 格式：HH:MM
     lat: str = Query(...),          # 緯度，例如 24.98
     lon: str = Query(...),          # 經度，例如 121.54
     hsys: str = Query("placidus"),  # 宮位系統（預設 placidus）
@@ -26,18 +26,12 @@ def get_chart(
         dt = Datetime(date, time, '+08:00')
         pos = GeoPos(float(lat), float(lon))
 
-        # 建立星盤與宮位系統
-        chart = Chart(dt, pos, hsys)
+        # 建立星盤
+        chart = Chart(dt, pos)
+        chart.setHouses(hsys)  # ❗正確設定宮位系統
 
-        # 預設星體列表
-        default_ids = [
-            const.SUN, const.MOON, const.MERCURY, const.VENUS,
-            const.MARS, const.JUPITER, const.SATURN,
-            const.URANUS, const.NEPTUNE, const.PLUTO
-        ]
-
-        # 對照表：將簡寫轉換為 flatlib 的常數
-        mapped = {
+        # 星體 ID 對照表
+        id_map = {
             'sun': const.SUN, 'moon': const.MOON, 'mer': const.MERCURY, 'mercury': const.MERCURY,
             'venus': const.VENUS, 'ven': const.VENUS,
             'mars': const.MARS, 'jup': const.JUPITER, 'jupiter': const.JUPITER,
@@ -47,34 +41,35 @@ def get_chart(
             'plu': const.PLUTO, 'pluto': const.PLUTO
         }
 
-        # 決定要抓哪些星體
+        default_ids = [
+            const.SUN, const.MOON, const.MERCURY, const.VENUS,
+            const.MARS, const.JUPITER, const.SATURN,
+            const.URANUS, const.NEPTUNE, const.PLUTO
+        ]
+
         obj_ids = ids.split(',') if ids else default_ids
 
         planets = {}
         for obj in obj_ids:
             try:
-                obj = obj.strip().lower()
-                key = mapped.get(obj, obj)  # key 是 flatlib 的 const 字串或 fallback 原名
+                obj_clean = obj.strip().lower()
+                key = id_map.get(obj_clean, obj_clean)
                 p = chart.get(key)
-                planets[obj] = {
+                planets[obj_clean] = {
                     "sign": p.sign,
                     "lon": p.lon,
                     "lat": p.lat,
                     "house": chart.houseOf(p)
                 }
             except Exception as e:
-                planets[obj] = {"error": str(e)}
+                planets[obj_clean] = {"error": str(e)}
 
-        # 宮位資料
         houses = {}
-        try:
-            for i, house in enumerate(chart.houses, 1):
-                houses[f"House{i}"] = {
-                    "sign": house.sign,
-                    "lon": house.lon
-                }
-        except Exception as e:
-            houses = {"error": str(e)}
+        for i, house in enumerate(chart.houses, 1):
+            houses[f"House{i}"] = {
+                "sign": house.sign,
+                "lon": house.lon
+            }
 
         return {
             "status": "success",
