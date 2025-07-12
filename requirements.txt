@@ -1,0 +1,3 @@
+fastapi
+uvicorn
+flatlib @ git+https://github.com/flatangle/flatlib.git
