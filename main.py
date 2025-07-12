@@ -3,6 +3,7 @@ from flatlib.chart import Chart
 from flatlib.datetime import Datetime
 from flatlib.geopos import GeoPos
 from flatlib import const
+from flatlib.tools import houses  # ✅ 新增這行
 
 app = FastAPI()
 
@@ -41,10 +42,10 @@ def get_chart(
         pos = GeoPos(lat_str, lon_str)
         chart = Chart(dt, pos)
 
-        # 星體列表
+        # ✅ 改：僅使用七曜，不含外行星
         star_list = [
             const.SUN, const.MOON, const.MERCURY, const.VENUS, const.MARS,
-            const.JUPITER, const.SATURN, const.URANUS, const.NEPTUNE, const.PLUTO
+            const.JUPITER, const.SATURN
         ]
 
         planets = {}
@@ -55,7 +56,7 @@ def get_chart(
                     "sign": planet.sign,
                     "lon": planet.lon,
                     "lat": planet.lat,
-                    "house": chart.houseOf(planet)
+                    "house": houses.houseForPlanet(planet, chart.houses)  # ✅ 改用正確方法
                 }
             except Exception as inner:
                 planets[obj] = {"error": str(inner)}
