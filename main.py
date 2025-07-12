@@ -18,10 +18,11 @@ def get_chart(
     time: str = Query(...),         # 格式：HH:MM
     lat: str = Query(...),          # 緯度，例如 24.98
     lon: str = Query(...),          # 經度，例如 121.54
-    hsys: str = Query("placidus")   # 宮位系統（預設 placidus，可改 wholeSigns）
+    hsys: str = Query("placidus"),  # 宮位系統（預設 placidus）
+    ids: str = Query(None)          # 星體 ID，可選，格式："sun,moon,mer,..."
 ):
     try:
-        # 建立時間與地點（直接用 float 傳入，避免錯誤）
+        # 建立時間與地點
         dt = Datetime(date, time, '+08:00')
         pos = GeoPos(float(lat), float(lon))
 
@@ -29,12 +30,30 @@ def get_chart(
         chart = Chart(dt, pos)
         chart.setHouses(hsys)
 
+        # 處理星體清單
+        default_ids = [
+            const.SUN, const.MOON, const.MERCURY, const.VENUS,
+            const.MARS, const.JUPITER, const.SATURN,
+            const.URANUS, const.NEPTUNE, const.PLUTO
+        ]
+        obj_ids = ids.split(',') if ids else default_ids
+
         # 行星資料
         planets = {}
-        for obj in [const.SUN, const.MOON, const.MERCURY, const.VENUS,
-                    const.MARS, const.JUPITER, const.SATURN]:
+        for obj in obj_ids:
             try:
-                p = chart.get(obj)
+                obj = obj.strip().lower()
+                mapped = {
+                    'sun': const.SUN, 'moon': const.MOON, 'mer': const.MERCURY,
+                    'venus': const.VENUS, 'ven': const.VENUS,
+                    'mars': const.MARS, 'jup': const.JUPITER, 'jupiter': const.JUPITER,
+                    'sat': const.SATURN, 'saturn': const.SATURN,
+                    'ura': const.URANUS, 'uranus': const.URANUS,
+                    'nep': const.NEPTUNE, 'neptune': const.NEPTUNE,
+                    'plu': const.PLUTO, 'pluto': const.PLUTO
+                }
+                key = mapped.get(obj, obj)
+                p = chart.get(key)
                 planets[obj] = {
                     "sign": p.sign,
                     "lon": p.lon,
