@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query 
+from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
 from flatlib.chart import Chart
 from flatlib.datetime import Datetime
@@ -18,18 +18,18 @@ def get_chart(
     time: str = Query(...),         # 格式：HH:MM
     lat: str = Query(...),          # 緯度，例如 24.98
     lon: str = Query(...),          # 經度，例如 121.54
-    hsys: str = Query("placidus")   # 宮位系統（預設 placidus，可用 wholeSigns 等）
+    hsys: str = Query("placidus")   # 宮位系統（預設 placidus，可改 wholeSigns）
 ):
     try:
-        # 建立時間與地點
+        # 建立時間與地點（直接用 float 傳入，避免錯誤）
         dt = Datetime(date, time, '+08:00')
-        pos = GeoPos(float(lat), float(lon))  # ✅ 改成 float 傳入，避免座標錯誤
+        pos = GeoPos(float(lat), float(lon))
 
-        # 建立星盤
+        # 建立星盤與宮位系統
         chart = Chart(dt, pos)
         chart.setHouses(hsys)
 
-        # 取得行星資料
+        # 行星資料
         planets = {}
         for obj in [const.SUN, const.MOON, const.MERCURY, const.VENUS,
                     const.MARS, const.JUPITER, const.SATURN]:
@@ -44,7 +44,7 @@ def get_chart(
             except Exception as e:
                 planets[obj] = {"error": str(e)}
 
-        # 取得宮位資料
+        # 宮位資料
         houses = {}
         try:
             for i, house in enumerate(chart.houses, 1):
@@ -52,8 +52,8 @@ def get_chart(
                     "sign": house.sign,
                     "lon": house.lon
                 }
-        except:
-            houses = {"error": "failed to load houses"}
+        except Exception as e:
+            houses = {"error": str(e)}
 
         return {
             "status": "success",
