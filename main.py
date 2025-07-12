@@ -29,10 +29,10 @@ def parse_coord(val: str, is_lat=True):
 
 @app.get("/chart")
 def get_chart(
-    date: str = Query(...),    # YYYY-MM-DD
-    time: str = Query(...),    # HH:MM
-    lat: str = Query(...),     # 緯度（可輸入 float 或如 25n02）
-    lon: str = Query(...)      # 經度（可輸入 float 或如 121e31）
+    date: str = Query(...),
+    time: str = Query(...),
+    lat: str = Query(...),
+    lon: str = Query(...)
 ):
     try:
         dt = Datetime(date, time, '+08:00')
@@ -42,7 +42,7 @@ def get_chart(
         pos = GeoPos(lat_str, lon_str)
         chart = Chart(dt, pos, hsys='wholeSigns')
 
-        # ➤ Planets（使用七曜，避免 flatlib 對 URANUS 等星出錯）
+        # ➤ Planets（七曜制，避免 flatlib 錯誤）
         star_list = [
             const.SUN, const.MOON, const.MERCURY,
             const.VENUS, const.MARS, const.JUPITER, const.SATURN
@@ -52,30 +52,36 @@ def get_chart(
         for obj in star_list:
             try:
                 planet = chart.get(obj)
-                planets[obj] = {
-                    "sign": planet.sign,
-                    "lon": planet.lon,
-                    "lat": planet.lat,
-                    "house": chart.houseOf(planet)
-                }
+                if planet:
+                    planets[obj] = {
+                        "sign": getattr(planet, "sign", "Unknown"),
+                        "lon": getattr(planet, "lon", None),
+                        "lat": getattr(planet, "lat", None),
+                        "house": chart.houseOf(planet)
+                    }
+                else:
+                    planets[obj] = {"error": "Planet not found in chart."}
             except Exception as inner:
                 planets[obj] = {"error": str(inner)}
 
         # ➤ Angles
-        asc = chart.get(const.ASC)
-        mc = chart.get(const.MC)
-        angles = {
-            "ASC": {"sign": asc.sign, "lon": asc.lon},
-            "MC": {"sign": mc.sign, "lon": mc.lon}
-        }
+        try:
+            asc = chart.get(const.ASC)
+            mc = chart.get(const.MC)
+            angles = {
+                "ASC": {"sign": asc.sign, "lon": asc.lon},
+                "MC": {"sign": mc.sign, "lon": mc.lon}
+            }
+        except Exception as angle_error:
+            angles = {"error": str(angle_error)}
 
         # ➤ Houses
         house_cusps = {}
         try:
             for i, house in enumerate(chart.houses, start=1):
                 house_cusps[f"House{i}"] = {
-                    "sign": house.sign,
-                    "lon": house.lon
+                    "sign": getattr(house, "sign", "Unknown"),
+                    "lon": getattr(house, "lon", None)
                 }
         except Exception as house_error:
             house_cusps = {"error": str(house_error)}
@@ -84,7 +90,7 @@ def get_chart(
             "status": "success",
             "houseSystem": "wholeSigns",
             "tropical": True,
-            "datetime": dt,
+            "datetime": str(dt),
             "angles": angles,
             "houses": house_cusps,
             "planets": planets
