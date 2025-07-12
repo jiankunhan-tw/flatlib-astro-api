@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query 
 from fastapi.responses import JSONResponse
 from flatlib.chart import Chart
 from flatlib.datetime import Datetime
@@ -16,18 +16,16 @@ def root():
 def get_chart(
     date: str = Query(...),         # 格式：YYYY-MM-DD
     time: str = Query(...),         # 格式：HH:MM
-    lat: str = Query(...),          # 緯度（需為字串）
-    lon: str = Query(...),          # 經度（需為字串）
+    lat: str = Query(...),          # 緯度，必須轉成 float
+    lon: str = Query(...),          # 經度，必須轉成 float
     hsys: str = Query("placidus"),  # 宮位系統
-    ids: str = Query(None)          # 星體 ID，可選
+    ids: str = Query(None)          # 星體 ID（可選）
 ):
     try:
-        # 強制轉字串避免浮點格式錯誤
-        lat = str(lat)
-        lon = str(lon)
-
         dt = Datetime(date, time, '+08:00')
-        pos = GeoPos(lat, lon)
+
+        # ✅ 這裡強制轉成 float 避免 flatlib 誤判為 "25:36:00" 格式
+        pos = GeoPos(float(lat), float(lon))
         chart = Chart(dt, pos)
         chart.setHouses(hsys)
 
