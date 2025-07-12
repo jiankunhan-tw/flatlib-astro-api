@@ -15,7 +15,7 @@ def root():
 @app.get("/chart")
 def get_chart(
     date: str = Query(...),         # 格式：YYYY-MM-DD
-    time: str = Query(...),         # 格式：HH:MM
+    time: str = Query(...),         # 格式：HH:MM 或 HH:MM:SS
     lat: str = Query(...),          # 緯度，例如 24.98
     lon: str = Query(...),          # 經度，例如 121.54
     hsys: str = Query("placidus"),  # 宮位系統（預設 placidus）
@@ -27,32 +27,34 @@ def get_chart(
         pos = GeoPos(float(lat), float(lon))
 
         # 建立星盤與宮位系統
-        chart = Chart(dt, pos)
-        chart.setHouses(hsys)
+        chart = Chart(dt, pos, hsys)
 
-        # 處理星體清單
+        # 預設星體列表
         default_ids = [
             const.SUN, const.MOON, const.MERCURY, const.VENUS,
             const.MARS, const.JUPITER, const.SATURN,
             const.URANUS, const.NEPTUNE, const.PLUTO
         ]
+
+        # 對照表：將簡寫轉換為 flatlib 的常數
+        mapped = {
+            'sun': const.SUN, 'moon': const.MOON, 'mer': const.MERCURY, 'mercury': const.MERCURY,
+            'venus': const.VENUS, 'ven': const.VENUS,
+            'mars': const.MARS, 'jup': const.JUPITER, 'jupiter': const.JUPITER,
+            'sat': const.SATURN, 'saturn': const.SATURN,
+            'ura': const.URANUS, 'uranus': const.URANUS,
+            'nep': const.NEPTUNE, 'neptune': const.NEPTUNE,
+            'plu': const.PLUTO, 'pluto': const.PLUTO
+        }
+
+        # 決定要抓哪些星體
         obj_ids = ids.split(',') if ids else default_ids
 
-        # 行星資料
         planets = {}
         for obj in obj_ids:
             try:
                 obj = obj.strip().lower()
-                mapped = {
-                    'sun': const.SUN, 'moon': const.MOON, 'mer': const.MERCURY,
-                    'venus': const.VENUS, 'ven': const.VENUS,
-                    'mars': const.MARS, 'jup': const.JUPITER, 'jupiter': const.JUPITER,
-                    'sat': const.SATURN, 'saturn': const.SATURN,
-                    'ura': const.URANUS, 'uranus': const.URANUS,
-                    'nep': const.NEPTUNE, 'neptune': const.NEPTUNE,
-                    'plu': const.PLUTO, 'pluto': const.PLUTO
-                }
-                key = mapped.get(obj, obj)
+                key = mapped.get(obj, obj)  # key 是 flatlib 的 const 字串或 fallback 原名
                 p = chart.get(key)
                 planets[obj] = {
                     "sign": p.sign,
