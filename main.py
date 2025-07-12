@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query 
 from fastapi.responses import JSONResponse
 from flatlib.chart import Chart
 from flatlib.datetime import Datetime
@@ -42,10 +42,10 @@ def get_chart(
         pos = GeoPos(lat_str, lon_str)
         chart = Chart(dt, pos, hsys='wholeSigns')
 
-        # ➤ Planets
+        # ➤ Planets（使用七曜，避免 flatlib 對 URANUS 等星出錯）
         star_list = [
-            const.SUN, const.MOON, const.MERCURY, const.VENUS, const.MARS,
-            const.JUPITER, const.SATURN, const.URANUS, const.NEPTUNE, const.PLUTO
+            const.SUN, const.MOON, const.MERCURY,
+            const.VENUS, const.MARS, const.JUPITER, const.SATURN
         ]
 
         planets = {}
