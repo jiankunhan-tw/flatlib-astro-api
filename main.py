@@ -3,7 +3,6 @@ from flatlib.chart import Chart
 from flatlib.datetime import Datetime
 from flatlib.geopos import GeoPos
 from flatlib import const
-import flatlib
 
 app = FastAPI()
 
@@ -15,14 +14,14 @@ def root():
 def get_chart(
     date: str = Query(...),    # YYYY-MM-DD
     time: str = Query(...),    # HH:MM
-    lat: str = Query(...),     # 緯度，可是 float 或 '25n02'
-    lon: str = Query(...)      # 經度，可是 float 或 '121e31'
+    lat: str = Query(...),     # 緯度，可為 float 或 '25n02'
+    lon: str = Query(...)      # 經度，可為 float 或 '121e31'
 ):
     try:
         dt = Datetime(date, time, '+08:00')
 
         def parse_coord(val: str, is_lat=True):
-            if any(c.isalpha() for c in val):
+            if any(c.isalpha() for c in val):  # 已是 flatlib 格式
                 return val.lower()
             else:
                 val = float(val)
@@ -55,10 +54,10 @@ def get_chart(
                     "sign": planet.sign,
                     "lon": planet.lon,
                     "lat": planet.lat,
-                    "house": chart.houseOf(planet)
+                    "house": getattr(planet, 'house', None)
                 }
-            except Exception as e:
-                planets[obj] = {"error": str(e)}
+            except Exception as inner:
+                planets[obj] = {"error": str(inner)}
 
         return {
             "status": "success",
