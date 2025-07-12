@@ -2,7 +2,6 @@ from fastapi import FastAPI, Query
 from flatlib.chart import Chart
 from flatlib.datetime import Datetime
 from flatlib.geopos import GeoPos
-from flatlib import const
 
 app = FastAPI()
 
@@ -44,11 +43,12 @@ def get_chart(
         print("⚠️ [debug] lat_str =", lat_str)
         print("⚠️ [debug] lon_str =", lon_str)
 
-        # ➤ 建立星盤（指定 Placidus 宮位制）
+        # ➤ 建立星盤（使用 placidus 宮位制，字串傳入）
         pos = GeoPos(lat_str, lon_str)
-        chart = Chart(dt, pos, hsys=const.PLACIDUS)
+        chart = Chart(dt, pos, hsys='placidus')
 
         # ➤ 星體列表
+        from flatlib import const
         star_list = [
             const.SUN, const.MOON, const.MERCURY, const.VENUS, const.MARS,
             const.JUPITER, const.SATURN, const.URANUS, const.NEPTUNE, const.PLUTO
