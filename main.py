@@ -25,7 +25,7 @@ def to_coord(val: str, is_lat=True):
         )
         return f"{deg}{direction}{minutes:02}"
     except:
-        return val  # assume already formatted
+        return val
 
 @app.get("/chart")
 def get_chart(
@@ -41,10 +41,8 @@ def get_chart(
         lon_str = to_coord(lon, is_lat=False)
         pos = GeoPos(lat_str, lon_str)
 
-        if hsys not in ['wholeSigns', 'placidus']:
-            hsys = 'wholeSigns'
-
-        chart = Chart(dt, pos, hsys)
+        chart = Chart(dt, pos)
+        chart.setHouses(hsys)
 
         planets = {}
         for obj in [const.SUN, const.MOON, const.MERCURY, const.VENUS,
