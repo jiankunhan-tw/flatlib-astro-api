@@ -35,13 +35,20 @@ def get_chart(
                 )
                 return f"{deg}{direction}{minutes:02}"
 
+        # ➤ 轉換經緯度格式
         lat_str = parse_coord(lat, is_lat=True)
         lon_str = parse_coord(lon, is_lat=False)
 
-        pos = GeoPos(lat_str, lon_str)
-        chart = Chart(dt, pos)
+        # ➤ Debug Log：可在 Zeabur log 查看
+        print("⚠️ [debug] dt =", dt)
+        print("⚠️ [debug] lat_str =", lat_str)
+        print("⚠️ [debug] lon_str =", lon_str)
 
-        # 星體列表
+        # ➤ 建立星盤（指定 Placidus 宮位制）
+        pos = GeoPos(lat_str, lon_str)
+        chart = Chart(dt, pos, hsys=const.PLACIDUS)
+
+        # ➤ 星體列表
         star_list = [
             const.SUN, const.MOON, const.MERCURY, const.VENUS, const.MARS,
             const.JUPITER, const.SATURN, const.URANUS, const.NEPTUNE, const.PLUTO
