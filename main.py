@@ -33,12 +33,13 @@ def get_chart(
         result = []
         for obj in safe_objects:
             body = chart.get(obj)
-            house = chart.houseOf(body)  # ✅ 正確取得宮位
+            # 取得星體的黃道度數，然後從 houses 找到對應宮位
+            house_id = chart.houses.getHousePos(body.lon).id  # ✅ 正確用法
             result.append({
                 'name': body.id,
                 'sign': body.sign,
                 'lon': round(body.lon, 2),
-                'house': house
+                'house': house_id
             })
 
         return JSONResponse(content={
