@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query 
+from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
 from flatlib.chart import Chart
 from flatlib.datetime import Datetime
@@ -24,7 +24,6 @@ def get_chart(
         pos = GeoPos(lat, lon)
         chart = Chart(dt, pos, hsys=const.HOUSES_PLACIDUS)
 
-        # 七大主要星體
         safe_objects = [
             const.SUN, const.MOON,
             const.MERCURY, const.VENUS, const.MARS,
@@ -34,12 +33,13 @@ def get_chart(
         result = []
         for obj in safe_objects:
             body = chart.get(obj)
-            house_id = chart.houses.houseOf(body)  # ✅ 用正確方法取得宮位
+            # ✅ 改用 chart.houseOf(body.lon) 才能正確取得宮位
+            house = chart.houses.getHouse(body.lon).id
             result.append({
                 'name': body.id,
                 'sign': body.sign,
                 'lon': round(body.lon, 2),
-                'house': house_id
+                'house': house
             })
 
         return JSONResponse(content={
