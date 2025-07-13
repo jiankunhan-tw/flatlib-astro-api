@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query  
+from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
 from flatlib.chart import Chart
 from flatlib.datetime import Datetime
@@ -14,23 +14,24 @@ def root():
 
 @app.get("/chart")
 def get_chart(
-    date: str = Query(...),         
-    time: str = Query(...),         
-    lat: float = Query(...),        # ✅ 改為 float，不再用 str
-    lon: float = Query(...),        # ✅ 改為 float，不再用 str
-    hsys: str = Query("placidus"),  
-    ids: str = Query(None)          
+    date: str = Query(...),          # 格式 yyyy-mm-dd
+    time: str = Query(...),          # 格式 hh:mm 或 hh:mm:ss
+    lat: float = Query(...),         # 緯度（小數格式）
+    lon: float = Query(...),         # 經度（小數格式）
+    hsys: str = Query("placidus"),   # 宮位系統，預設 placidus
+    ids: str = Query(None)           # 想查的星體，例如 "sun,moon,venus"
 ):
     try:
-        # ⛑️ 若缺秒數則補 ":00"
+        # 如果時間格式沒包含秒，補上 ":00"
         if len(time.split(":")) == 2:
             time += ":00"
 
+        # 設定台灣時區 +08:00（你可自行改）
         dt = Datetime(date, time, '+08:00')
         pos = GeoPos(lat, lon)
-        chart = Chart(dt, pos)
-        chart.setHouses(hsys)
+        chart = Chart(dt, pos, hsys=hsys)
 
+        # 可查的星體
         allowed_ids = {
             'sun': const.SUN, 'moon': const.MOON,
             'mercury': const.MERCURY, 'venus': const.VENUS, 'mars': const.MARS,
@@ -44,20 +45,22 @@ def get_chart(
         else:
             obj_ids = list(allowed_ids.values())
 
+        # 取得行星資料
         planets = {}
         for key in obj_ids:
             p = chart.get(key)
             planets[key] = {
                 "sign": p.sign,
-                "lon": p.lon,
-                "lat": p.lat,
+                "lon": round(p.lon, 2),
+                "lat": round(p.lat, 2),
                 "house": chart.houseOf(p)
             }
 
+        # 取得12宮資料
         houses = {
             f"House{i}": {
                 "sign": house.sign,
-                "lon": house.lon
+                "lon": round(house.lon, 2)
             } for i, house in enumerate(chart.houses, 1)
         }
 
