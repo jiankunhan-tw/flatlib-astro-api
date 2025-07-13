@@ -15,15 +15,17 @@ def root():
 
 def get_house_by_lon(houses, lon):
     """
-    根據黃道度數回傳星體落入的宮位
+    根據黃道度數判斷星體落入的宮位
     """
     for i in range(1, 13):
-        h1 = houses.getHouse(i)
-        h2 = houses.getHouse(i % 12 + 1)
+        h1 = houses[i]
+        h2 = houses[i + 1] if i < 12 else houses[1]  # wrap around
         start = h1.lon
         end = h2.lon if h2.lon > start else h2.lon + 360
 
-        if start <= lon < end:
+        # 把星體度數也轉成同一圈範圍
+        lon_adj = lon if lon >= start else lon + 360
+        if start <= lon_adj < end:
             return i
     return None
 
@@ -42,7 +44,7 @@ def get_chart(
         pos = GeoPos(lat, lon)
         chart = Chart(dt, pos, hsys=const.HOUSES_PLACIDUS)
 
-        # 七大星體
+        # 星體
         planets = [
             const.SUN, const.MOON,
             const.MERCURY, const.VENUS, const.MARS,
@@ -60,31 +62,25 @@ def get_chart(
                 'house': house_num
             })
 
-        # 十二宮起點資訊
+        # 十二宮起點
         house_result = []
         for i in range(1, 13):
-            h = chart.houses.getHouse(i)
+            h = chart.houses[i]
             house_result.append({
                 'house': i,
                 'sign': h.sign,
                 'lon': round(h.lon, 2)
             })
 
-        # 上升、天頂
+        # 上升與天頂
         asc = chart.get(const.ASC)
         mc = chart.get(const.MC)
 
         return JSONResponse(content={
             'datetime': f"{date} {time} {tz}",
             'location': {'lat': lat, 'lon': lon},
-            'asc': {
-                'sign': asc.sign,
-                'lon': round(asc.lon, 2)
-            },
-            'mc': {
-                'sign': mc.sign,
-                'lon': round(mc.lon, 2)
-            },
+            'asc': {'sign': asc.sign, 'lon': round(asc.lon, 2)},
+            'mc': {'sign': mc.sign, 'lon': round(mc.lon, 2)},
             'chart': planet_result,
             'houses': house_result
         })
