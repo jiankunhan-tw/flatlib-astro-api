@@ -24,7 +24,7 @@ def get_chart(
         pos = GeoPos(lat, lon)
         chart = Chart(dt, pos, hsys=const.HOUSES_PLACIDUS)
 
-        # 只取七顆主要行星
+        # 七大主要星體
         safe_objects = [
             const.SUN, const.MOON,
             const.MERCURY, const.VENUS, const.MARS,
@@ -34,12 +34,12 @@ def get_chart(
         result = []
         for obj in safe_objects:
             body = chart.get(obj)
-            house = chart.houses.getHouse(body)  # ⬅️ 正確取得宮位
+            house_id = chart.houses.houseOf(body)  # ✅ 用正確方法取得宮位
             result.append({
                 'name': body.id,
                 'sign': body.sign,
                 'lon': round(body.lon, 2),
-                'house': house.id
+                'house': house_id
             })
 
         return JSONResponse(content={
