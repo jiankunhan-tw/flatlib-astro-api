@@ -1,8 +1,9 @@
-from fastapi import FastAPI, Query  
+from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
 from flatlib.chart import Chart
 from flatlib.datetime import Datetime
 from flatlib.geopos import GeoPos
+from flatlib import const
 
 app = FastAPI()
 
@@ -23,14 +24,15 @@ def get_chart(
         pos = GeoPos(lat, lon)
         chart = Chart(dt, pos)
 
-        # ✅ 僅使用七大行星（傳統解盤足夠，且 flatlib 支援）
-        main_planets = [
-            'Sun', 'Moon', 'Mercury', 'Venus', 'Mars',
-            'Jupiter', 'Saturn'
+        # 只取七顆主要行星（有宮位）
+        safe_objects = [
+            const.SUN, const.MOON,
+            const.MERCURY, const.VENUS, const.MARS,
+            const.JUPITER, const.SATURN
         ]
 
         result = []
-        for obj in main_planets:
+        for obj in safe_objects:
             body = chart.get(obj)
             result.append({
                 'name': body.id,
