@@ -11,6 +11,20 @@ app = FastAPI()
 def root():
     return {"message": "Flatlib API is running!"}
 
+def get_house_by_lon(houses, lon):
+    """
+    根據黃道度數回傳星體落入的宮位
+    """
+    for i in range(1, 13):
+        h1 = houses.get(str(i))
+        h2 = houses.get(str(i % 12 + 1))  # 下一宮
+        start = h1.lon
+        end = h2.lon if h2.lon > start else h2.lon + 360
+
+        if start <= lon < end:
+            return i
+    return None
+
 @app.get("/chart")
 def get_chart(
     date: str = Query(...),
@@ -33,13 +47,12 @@ def get_chart(
         result = []
         for obj in safe_objects:
             body = chart.get(obj)
-            # 取得星體的黃道度數，然後從 houses 找到對應宮位
-            house_id = chart.houses.getHousePos(body.lon).id  # ✅ 正確用法
+            house_num = get_house_by_lon(chart.houses, body.lon)
             result.append({
                 'name': body.id,
                 'sign': body.sign,
                 'lon': round(body.lon, 2),
-                'house': house_id
+                'house': house_num
             })
 
         return JSONResponse(content={
