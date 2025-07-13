@@ -33,8 +33,7 @@ def get_chart(
         result = []
         for obj in safe_objects:
             body = chart.get(obj)
-            # ✅ 改用 chart.houseOf(body.lon) 才能正確取得宮位
-            house = chart.houses.getHouse(body.lon).id
+            house = chart.houseOf(body)  # ✅ 正確取得宮位
             result.append({
                 'name': body.id,
                 'sign': body.sign,
