@@ -13,8 +13,8 @@ def root():
 
 def get_house_by_lon(houses, lon):
     for i in range(1, 13):
-        h1 = houses[i]
-        h2 = houses[i + 1] if i < 12 else houses[1]
+        h1 = houses.get(i)
+        h2 = houses.get(i + 1) if i < 12 else houses.get(1)
         start = h1.lon
         end = h2.lon if h2.lon > start else h2.lon + 360
         lon_adj = lon if lon >= start else lon + 360
@@ -54,7 +54,7 @@ def get_chart(
 
         house_result = []
         for i in range(1, 13):
-            h = chart.houses[i]
+            h = chart.houses.get(i)
             house_result.append({
                 'house': i,
                 'sign': h.sign,
