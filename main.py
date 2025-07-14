@@ -11,17 +11,28 @@ app = FastAPI()
 def root():
     return {"message": "Flatlib API is running."}
 
-def get_house_by_lon(houses, lon):
-    for i in range(1, 13):
-        h1 = houses.get(i)
-        h2 = houses.get(i + 1) if i < 12 else houses.get(1)
-        if not h1 or not h2:
-            continue
-        start = h1.lon
-        end = h2.lon if h2.lon > start else h2.lon + 360
-        lon_adj = lon if lon >= start else lon + 360
-        if start <= lon_adj < end:
-            return i
+# 🛡️ 安全取得宮位（避免出錯）
+def safe_get_house(chart, i):
+    try:
+        return chart.houses.get(i)
+    except Exception:
+        return None
+
+# 🎯 根據行度取得星體所在宮位
+def get_house_by_lon(chart, lon):
+    try:
+        for i in range(1, 13):
+            h1 = safe_get_house(chart, i)
+            h2 = safe_get_house(chart, i + 1 if i < 12 else 1)
+            if not h1 or not h2:
+                continue
+            start = h1.lon
+            end = h2.lon if h2.lon > start else h2.lon + 360
+            lon_adj = lon if lon >= start else lon + 360
+            if start <= lon_adj < end:
+                return i
+    except Exception:
+        return None
     return None
 
 @app.get("/chart")
@@ -45,7 +56,7 @@ def get_chart(
         planet_result = []
         for obj in planets:
             body = chart.get(obj)
-            house_num = get_house_by_lon(chart.houses, body.lon)
+            house_num = get_house_by_lon(chart, body.lon)
             planet_result.append({
                 'name': body.id,
                 'sign': body.sign,
@@ -55,7 +66,7 @@ def get_chart(
 
         house_result = []
         for i in range(1, 13):
-            h = chart.houses.get(i)
+            h = safe_get_house(chart, i)
             if h:
                 house_result.append({
                     'house': i,
