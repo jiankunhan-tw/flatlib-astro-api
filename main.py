@@ -12,12 +12,9 @@ def root():
     return {"message": "Flatlib API is running."}
 
 def get_house_by_lon(houses, lon):
-    """
-    根據黃道度數判斷星體落入的宮位
-    """
     for i in range(1, 13):
-        h1 = houses.getHouse(i)
-        h2 = houses.getHouse(i + 1) if i < 12 else houses.getHouse(1)  # wrap around
+        h1 = houses[i]
+        h2 = houses[i + 1] if i < 12 else houses[1]
         start = h1.lon
         end = h2.lon if h2.lon > start else h2.lon + 360
         lon_adj = lon if lon >= start else lon + 360
@@ -27,19 +24,17 @@ def get_house_by_lon(houses, lon):
 
 @app.get("/chart")
 def get_chart(
-    date: str = Query(..., example="1995-04-04"),
-    time: str = Query(..., example="11:30"),
-    lat: float = Query(..., example=25.03),
-    lon: float = Query(..., example=121.56),
+    date: str = Query(...),
+    time: str = Query(...),
+    lat: float = Query(...),
+    lon: float = Query(...),
     tz: str = Query("+08:00")
 ):
     try:
-        # 建立星盤
         dt = Datetime(date, time, tz)
         pos = GeoPos(lat, lon)
         chart = Chart(dt, pos, hsys=const.HOUSES_PLACIDUS)
 
-        # 星體
         planets = [
             const.SUN, const.MOON,
             const.MERCURY, const.VENUS, const.MARS,
@@ -57,17 +52,15 @@ def get_chart(
                 'house': house_num
             })
 
-        # 十二宮起點
         house_result = []
         for i in range(1, 13):
-            h = chart.houses.getHouse(i)
+            h = chart.houses[i]
             house_result.append({
                 'house': i,
                 'sign': h.sign,
                 'lon': round(h.lon, 2)
             })
 
-        # 上升與天頂
         asc = chart.get(const.ASC)
         mc = chart.get(const.MC)
 
