@@ -12,7 +12,7 @@ class ChartRequest(BaseModel):
     time: str       # 格式：11:35
     lat: float      # 緯度
     lon: float      # 經度
-    tz: str         # 時區（+08:00 或 8）
+    tz: str         # 時區（+08:00 或 "8"）
 
 def parse_timezone(tz):
     try:
@@ -28,9 +28,11 @@ def parse_timezone(tz):
 @app.post("/chart")
 def analyze_chart(req: ChartRequest):
     try:
+        # ✅ 修正時區與位置格式
         tz_fixed = parse_timezone(req.tz)
         date = Datetime(req.date, req.time, tz_fixed)
-        pos = GeoPos(req.lat, req.lon)
+        pos = GeoPos(str(req.lat), str(req.lon))  # 必須是 str
+
         chart = Chart(date, pos, hsys=const.HOUSES_PLACIDUS)
 
         planets = {}
