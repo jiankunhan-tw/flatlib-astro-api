@@ -88,3 +88,7 @@ def get_chart(
 
     except Exception as e:
         return JSONResponse(status_code=400, content={'error': str(e)})
+@app.get("/ping")
+def ping():
+    return {"status": "ok", "version": "v2025-07-14"}
+
