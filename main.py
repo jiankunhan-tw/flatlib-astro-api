@@ -8,11 +8,11 @@ from flatlib import const
 app = FastAPI()
 
 class ChartRequest(BaseModel):
-    date: str       # 格式：1995/04/04
-    time: str       # 格式：11:35
-    lat: float      # 緯度
-    lon: float      # 經度
-    tz: str         # 時區（+08:00 或 "8"）
+    date: str
+    time: str
+    lat: float
+    lon: float
+    tz: str
 
 def parse_timezone(tz):
     try:
@@ -25,13 +25,24 @@ def parse_timezone(tz):
     except:
         return 0.0
 
+# ✅ 轉換小數經緯度為 DMS 字串格式
+def deg_to_dms_string(deg):
+    d = int(deg)
+    m_float = abs(deg - d) * 60
+    m = int(m_float)
+    s = int((m_float - m) * 60)
+    return f"{d}:{m}:{s}"
+
 @app.post("/chart")
 def analyze_chart(req: ChartRequest):
     try:
-        # ✅ 修正時區與位置格式
         tz_fixed = parse_timezone(req.tz)
         date = Datetime(req.date, req.time, tz_fixed)
-        pos = GeoPos(str(req.lat), str(req.lon))  # 必須是 str
+
+        # ✅ 修正：轉換為度分秒格式
+        lat_str = deg_to_dms_string(req.lat)
+        lon_str = deg_to_dms_string(req.lon)
+        pos = GeoPos(lat_str, lon_str)
 
         chart = Chart(date, pos, hsys=const.HOUSES_PLACIDUS)
 
