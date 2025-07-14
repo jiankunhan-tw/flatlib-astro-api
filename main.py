@@ -14,25 +14,11 @@ class ChartRequest(BaseModel):
     lon: float      # 例如 121.539595
     tz: float       # 例如 8.0
 
-def deg_to_dms_string(degree: float) -> str:
-    """將 float 經緯轉成 D:M:S 字串"""
-    is_negative = degree < 0
-    degree = abs(degree)
-    d = int(degree)
-    m_float = (degree - d) * 60
-    m = int(m_float)
-    s = int((m_float - m) * 60)
-    dms = f"{'-' if is_negative else ''}{d}:{m}:{s}"
-    return dms
-
 @app.post("/chart")
 def analyze_chart(req: ChartRequest):
     try:
-        # 處理時間與位置
+        # 組合時間
         date = Datetime(req.date, req.time, req.tz)
-        lat_dms = deg_to_dms_string(req.lat)
-        lon_dms = deg_to_dms_string(req.lon)
-        pos = GeoPos(lat_dms, lon_dms)
         jd = date.jd
 
         # 只抓10大行星
@@ -41,7 +27,7 @@ def analyze_chart(req: ChartRequest):
 
         result = {}
         for obj in OBJECTS:
-            swe_obj = swe.getObject(obj, jd, pos.lat, pos.lon)
+            swe_obj = swe.sweObject(obj, jd)
             result[obj] = {
                 'sign': swe_obj.sign,
                 'lon': swe_obj.lon,
