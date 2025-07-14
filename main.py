@@ -25,7 +25,6 @@ def parse_timezone(tz):
     except:
         return 0.0
 
-# ✅ 轉換小數經緯度為 DMS 字串格式
 def deg_to_dms_string(deg):
     d = int(deg)
     m_float = abs(deg - d) * 60
@@ -33,13 +32,19 @@ def deg_to_dms_string(deg):
     s = int((m_float - m) * 60)
     return f"{d}:{m}:{s}"
 
+# ✅ 用手動安全列表避免 flatlib swe bug
+OBJECTS = [
+    const.SUN, const.MOON, const.MERCURY, const.VENUS,
+    const.MARS, const.JUPITER, const.SATURN,
+    const.URANUS, const.NEPTUNE, const.PLUTO
+]
+
 @app.post("/chart")
 def analyze_chart(req: ChartRequest):
     try:
         tz_fixed = parse_timezone(req.tz)
         date = Datetime(req.date, req.time, tz_fixed)
 
-        # ✅ 修正：轉換為度分秒格式
         lat_str = deg_to_dms_string(req.lat)
         lon_str = deg_to_dms_string(req.lon)
         pos = GeoPos(lat_str, lon_str)
@@ -47,7 +52,7 @@ def analyze_chart(req: ChartRequest):
         chart = Chart(date, pos, hsys=const.HOUSES_PLACIDUS)
 
         planets = {}
-        for obj in const.LIST_OBJECTS:
+        for obj in OBJECTS:
             obj_data = chart.get(obj)
             planets[obj] = {
                 'sign': obj_data.sign,
