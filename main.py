@@ -1,66 +1,63 @@
 from fastapi import FastAPI, Query
-from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from flatlib.datetime import Datetime
 from flatlib.chart import Chart
 from flatlib import const
-from flatlib.datetime import Datetime
-from flatlib.geopos import GeoPos
-import uvicorn
 
 app = FastAPI()
 
-# CORS 設定
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 class ChartRequest(BaseModel):
-    date: str       # "1995/04/04"
-    time: str       # "11:35"
-    tz: str         # "+08:00" 或 "8"
-    lat: float      # 25.0132
-    lon: float      # 121.4654
+    date: str       # 格式：1995/04/04
+    time: str       # 格式：11:35
+    lat: float      # 緯度
+    lon: float      # 經度
+    tz: str         # 時區（+08:00 或 8）
+
+def parse_timezone(tz):
+    try:
+        if isinstance(tz, str):
+            # 若是 "+08:00" 或 "+8:00"
+            if ':' in tz:
+                return int(tz.replace('+', '').split(':')[0])
+            elif tz.startswith('+') or tz.startswith('-'):
+                return int(tz)
+        return float(tz)
+    except:
+        return 0.0
+
 
 @app.post("/chart")
-def get_chart(req: ChartRequest):
+def analyze_chart(req: ChartRequest):
     try:
-        dt = Datetime(req.date, req.time, req.tz)
-        pos = GeoPos(req.lat, req.lon)
-        chart = Chart(dt, pos, hsys=const.HOUSES_PLACIDUS)
+        # 修正時區格式為 float（避免 tuple index error）
+        tz_fixed = parse_timezone(req.tz)
 
-        result = {
-            "ascendant": chart.get(const.ASC).sign,
-            "midheaven": chart.get(const.MC).sign,
-            "sun": chart.get(const.SUN).sign,
-            "moon": chart.get(const.MOON).sign,
-            "houses": {},
-            "planets": {}
-        }
+        # 建立 Datetime 物件
+        date = Datetime(req.date, req.time, tz_fixed)
 
-        # 宮位資訊
-        for i in range(1, 13):
-            house = chart.getHouse(i)
-            result["houses"][f"house_{i}"] = house.sign
+        # 建立星盤
+        chart = Chart(date, (req.lat, req.lon), hsys=const.HOUSES_PLACIDUS)
 
-        # 行星資訊
-        for obj in [const.SUN, const.MOON, const.MERCURY, const.VENUS, const.MARS,
-                    const.JUPITER, const.SATURN, const.URANUS, const.NEPTUNE, const.PLUTO]:
-            item = chart.get(obj)
-            result["planets"][obj] = {
-                "sign": item.sign,
-                "house": item.house
+        # 提取行星資訊
+        planets = {}
+        for obj in const.LIST_OBJECTS:
+            obj_data = chart.get(obj)
+            planets[obj] = {
+                'sign': obj_data.sign,
+                'lon': obj_data.lon,
+                'house': obj_data.house
             }
 
-        return result
-
-    except Exception as e:
         return {
-            "status": "error",
-            "message": str(e)
+            "status": "success",
+            "planets": planets
         }
 
-if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    except Exception as e:
+        import traceback
+        return {
+            "status": "error",
+            "message": str(e),
+            "trace": traceback.format_exc()
+        }
