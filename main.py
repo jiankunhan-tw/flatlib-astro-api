@@ -1,11 +1,11 @@
-from fastapi import FastAPI, Query
+from fastapi import FastAPI
 from pydantic import BaseModel
 from flatlib.datetime import Datetime
 from flatlib.chart import Chart
+from flatlib.geopos import GeoPos
 from flatlib import const
 
 app = FastAPI()
-
 
 class ChartRequest(BaseModel):
     date: str       # 格式：1995/04/04
@@ -17,7 +17,6 @@ class ChartRequest(BaseModel):
 def parse_timezone(tz):
     try:
         if isinstance(tz, str):
-            # 若是 "+08:00" 或 "+8:00"
             if ':' in tz:
                 return int(tz.replace('+', '').split(':')[0])
             elif tz.startswith('+') or tz.startswith('-'):
@@ -26,20 +25,14 @@ def parse_timezone(tz):
     except:
         return 0.0
 
-
 @app.post("/chart")
 def analyze_chart(req: ChartRequest):
     try:
-        # 修正時區格式為 float（避免 tuple index error）
         tz_fixed = parse_timezone(req.tz)
-
-        # 建立 Datetime 物件
         date = Datetime(req.date, req.time, tz_fixed)
+        pos = GeoPos(req.lat, req.lon)
+        chart = Chart(date, pos, hsys=const.HOUSES_PLACIDUS)
 
-        # 建立星盤
-        chart = Chart(date, (req.lat, req.lon), hsys=const.HOUSES_PLACIDUS)
-
-        # 提取行星資訊
         planets = {}
         for obj in const.LIST_OBJECTS:
             obj_data = chart.get(obj)
