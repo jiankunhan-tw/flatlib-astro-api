@@ -7,28 +7,23 @@ from flatlib import const
 
 app = FastAPI()
 
-
 @app.get("/")
 def root():
     return {"message": "Flatlib API is running."}
-
 
 def get_house_by_lon(houses, lon):
     """
     根據黃道度數判斷星體落入的宮位
     """
     for i in range(1, 13):
-        h1 = houses[i]
-        h2 = houses[i + 1] if i < 12 else houses[1]  # wrap around
+        h1 = houses.getHouse(i)
+        h2 = houses.getHouse(i + 1) if i < 12 else houses.getHouse(1)  # wrap around
         start = h1.lon
         end = h2.lon if h2.lon > start else h2.lon + 360
-
-        # 把星體度數也轉成同一圈範圍
         lon_adj = lon if lon >= start else lon + 360
         if start <= lon_adj < end:
             return i
     return None
-
 
 @app.get("/chart")
 def get_chart(
@@ -65,7 +60,7 @@ def get_chart(
         # 十二宮起點
         house_result = []
         for i in range(1, 13):
-            h = chart.houses[i]
+            h = chart.houses.getHouse(i)
             house_result.append({
                 'house': i,
                 'sign': h.sign,
