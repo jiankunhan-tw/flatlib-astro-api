@@ -9,23 +9,23 @@ import traceback
 app = FastAPI()
 
 class ChartRequest(BaseModel):
-    date: str
-    time: str
-    lat: float
-    lon: float
-    tz: float
+    date: str       # 例如 '1995-04-04'
+    time: str       # 例如 '11:30'
+    lat: float      # 例如 24.968371
+    lon: float      # 例如 121.438034
+    tz: float       # 例如 8.0
 
 @app.post("/chart")
 def analyze_chart(req: ChartRequest):
     try:
-        # Step 1: 基本資訊
+        # Step 1: 時間與地點處理
         date = Datetime(req.date, req.time, req.tz)
         pos = GeoPos(req.lat, req.lon)
 
-        # Step 2: 建立空 Chart（不自動加天體）
+        # Step 2: 空 chart（不預設加天體）
         chart = Chart(date, pos, hsys=const.HOUSES_PLACIDUS, IDs=[])
 
-        # Step 3: 自己加上安全的十顆星與點
+        # Step 3: 安全指定要哪些星體與點
         safe_objects = [
             const.SUN, const.MOON, const.MERCURY, const.VENUS, const.MARS,
             const.JUPITER, const.SATURN, const.URANUS, const.NEPTUNE, const.PLUTO,
