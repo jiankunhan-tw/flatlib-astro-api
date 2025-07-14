@@ -15,6 +15,8 @@ def get_house_by_lon(houses, lon):
     for i in range(1, 13):
         h1 = houses.get(i)
         h2 = houses.get(i + 1) if i < 12 else houses.get(1)
+        if not h1 or not h2:
+            continue
         start = h1.lon
         end = h2.lon if h2.lon > start else h2.lon + 360
         lon_adj = lon if lon >= start else lon + 360
@@ -36,9 +38,8 @@ def get_chart(
         chart = Chart(dt, pos, hsys=const.HOUSES_PLACIDUS)
 
         planets = [
-            const.SUN, const.MOON,
-            const.MERCURY, const.VENUS, const.MARS,
-            const.JUPITER, const.SATURN
+            const.SUN, const.MOON, const.MERCURY,
+            const.VENUS, const.MARS, const.JUPITER, const.SATURN
         ]
 
         planet_result = []
@@ -55,11 +56,12 @@ def get_chart(
         house_result = []
         for i in range(1, 13):
             h = chart.houses.get(i)
-            house_result.append({
-                'house': i,
-                'sign': h.sign,
-                'lon': round(h.lon, 2)
-            })
+            if h:
+                house_result.append({
+                    'house': i,
+                    'sign': h.sign,
+                    'lon': round(h.lon, 2)
+                })
 
         asc = chart.get(const.ASC)
         mc = chart.get(const.MC)
