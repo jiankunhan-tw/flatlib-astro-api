@@ -1,70 +1,22 @@
-from fastapi import FastAPI, Query
-from flatlib.chart import Chart
-from flatlib.datetime import Datetime
-from flatlib.geopos import GeoPos
-from flatlib import const
-
-app = FastAPI()
-
-@app.get("/")
-def root():
-    return {"message": "Flatlib API is running!"}
-
 @app.get("/chart")
-def get_chart(
-    date: str = Query(...),    # YYYY-MM-DD
-    time: str = Query(...),    # HH:MM
-    lat: str = Query(...),     # 緯度，可為 float 或 '25n02'
-    lon: str = Query(...)      # 經度，可為 float 或 '121e31'
-):
+def chart(date: str, time: str, lat: float, lon: float, tz: float):
     try:
-        dt = Datetime(date, time, '+08:00')
+        date_parts = date.strip().split('/')
+        if len(date_parts) != 3:
+            raise ValueError("Invalid date format. Must be YYYY/MM/DD")
+        year, month, day = map(int, date_parts)
 
-        def parse_coord(val: str, is_lat=True):
-            if any(c.isalpha() for c in val):  # 已是 flatlib 格式
-                return val.lower()
-            else:
-                val = float(val)
-                deg = abs(int(val))
-                minutes = int((abs(val) - deg) * 60)
-                direction = (
-                    'n' if is_lat and val >= 0 else
-                    's' if is_lat and val < 0 else
-                    'e' if not is_lat and val >= 0 else
-                    'w'
-                )
-                return f"{deg}{direction}{minutes:02}"
+        time_parts = time.strip().split(':')
+        if len(time_parts) != 2:
+            raise ValueError("Invalid time format. Must be HH:MM")
+        hour, minute = map(int, time_parts)
 
-        lat_str = parse_coord(lat, is_lat=True)
-        lon_str = parse_coord(lon, is_lat=False)
+        jd = julian.Day(year, month, day, hour, minute)
 
-        pos = GeoPos(lat_str, lon_str)
-        chart = Chart(dt, pos)
+        # 以下這裡放你原本用 flatlib 建 chart 的邏輯...
+        # chart = Chart(...)
 
-        star_list = [
-            const.SUN, const.MOON, const.MERCURY, const.VENUS, const.MARS,
-            const.JUPITER, const.SATURN, const.URANUS, const.NEPTUNE, const.PLUTO
-        ]
-
-        planets = {}
-        for obj in star_list:
-            try:
-                planet = chart.get(obj)
-                planets[obj] = {
-                    "sign": planet.sign,
-                    "lon": planet.lon,
-                    "lat": planet.lat,
-                    "house": getattr(planet, 'house', None)
-                }
-            except Exception as inner:
-                planets[obj] = {"error": str(inner)}
-
-        return {
-            "status": "success",
-            "placidus": True,
-            "tropical": True,
-            "planets": planets
-        }
+        return {"message": "成功建立命盤！"}  # 這是測試用，記得換成實際回傳
 
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return JSONResponse(status_code=400, content={"error": f"Invalid date or time format: {str(e)}"})
