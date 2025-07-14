@@ -1,22 +1,66 @@
-@app.get("/chart")
-def chart(date: str, time: str, lat: float, lon: float, tz: float):
+from fastapi import FastAPI, Query
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from flatlib.chart import Chart
+from flatlib import const
+from flatlib.datetime import Datetime
+from flatlib.geopos import GeoPos
+import uvicorn
+
+app = FastAPI()
+
+# CORS 設定
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+class ChartRequest(BaseModel):
+    date: str       # "1995/04/04"
+    time: str       # "11:35"
+    tz: str         # "+08:00" 或 "8"
+    lat: float      # 25.0132
+    lon: float      # 121.4654
+
+@app.post("/chart")
+def get_chart(req: ChartRequest):
     try:
-        date_parts = date.strip().split('/')
-        if len(date_parts) != 3:
-            raise ValueError("Invalid date format. Must be YYYY/MM/DD")
-        year, month, day = map(int, date_parts)
+        dt = Datetime(req.date, req.time, req.tz)
+        pos = GeoPos(req.lat, req.lon)
+        chart = Chart(dt, pos, hsys=const.HOUSES_PLACIDUS)
 
-        time_parts = time.strip().split(':')
-        if len(time_parts) != 2:
-            raise ValueError("Invalid time format. Must be HH:MM")
-        hour, minute = map(int, time_parts)
+        result = {
+            "ascendant": chart.get(const.ASC).sign,
+            "midheaven": chart.get(const.MC).sign,
+            "sun": chart.get(const.SUN).sign,
+            "moon": chart.get(const.MOON).sign,
+            "houses": {},
+            "planets": {}
+        }
 
-        jd = julian.Day(year, month, day, hour, minute)
+        # 宮位資訊
+        for i in range(1, 13):
+            house = chart.getHouse(i)
+            result["houses"][f"house_{i}"] = house.sign
 
-        # 以下這裡放你原本用 flatlib 建 chart 的邏輯...
-        # chart = Chart(...)
+        # 行星資訊
+        for obj in [const.SUN, const.MOON, const.MERCURY, const.VENUS, const.MARS,
+                    const.JUPITER, const.SATURN, const.URANUS, const.NEPTUNE, const.PLUTO]:
+            item = chart.get(obj)
+            result["planets"][obj] = {
+                "sign": item.sign,
+                "house": item.house
+            }
 
-        return {"message": "成功建立命盤！"}  # 這是測試用，記得換成實際回傳
+        return result
 
     except Exception as e:
-        return JSONResponse(status_code=400, content={"error": f"Invalid date or time format: {str(e)}"})
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
