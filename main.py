@@ -5,13 +5,9 @@ from flatlib.datetime import Datetime
 from flatlib.geopos import GeoPos
 from flatlib.chart import Chart
 from flatlib import const
-import flatlib.ephem.ephem as ephem
 import traceback
 from typing import List, Optional
 import uvicorn
-
-# 強制使用 flatlib 內建運算，不調用 swe
-ephem._setEphemEngine('builtin')
 
 app = FastAPI(title="占星API", description="提供占星圖分析服務", version="1.0.0")
 
