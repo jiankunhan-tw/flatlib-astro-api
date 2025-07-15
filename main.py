@@ -5,6 +5,7 @@ import traceback
 from typing import List, Optional
 import uvicorn
 import math
+import re
 from datetime import datetime, timezone, timedelta
 
 app = FastAPI(title="占星API", description="提供占星圖分析服務", version="1.0.0")
@@ -67,61 +68,154 @@ class UserInput(BaseModel):
     latitude: float
     longitude: float
 
+def parse_date_string(date_str):
+    """解析各種日期格式"""
+    try:
+        # 移除所有非數字字符，只保留數字
+        clean_date = re.sub(r'[^0-9]', '', date_str)
+        
+        # 確保是8位數字
+        if len(clean_date) == 8:
+            year = int(clean_date[:4])
+            month = int(clean_date[4:6])
+            day = int(clean_date[6:8])
+            return year, month, day
+        
+        # 如果不是8位，嘗試其他格式
+        if '/' in date_str:
+            parts = date_str.split('/')
+            if len(parts) == 3:
+                # 假設格式是 YYYY/MM/DD 或 MM/DD/YYYY
+                if len(parts[0]) == 4:  # YYYY/MM/DD
+                    return int(parts[0]), int(parts[1]), int(parts[2])
+                else:  # MM/DD/YYYY
+                    return int(parts[2]), int(parts[0]), int(parts[1])
+        
+        if '-' in date_str:
+            parts = date_str.split('-')
+            if len(parts) == 3:
+                # 假設格式是 YYYY-MM-DD
+                return int(parts[0]), int(parts[1]), int(parts[2])
+        
+        # 如果都不匹配，拋出錯誤
+        raise ValueError(f"無法解析日期格式: {date_str}")
+        
+    except Exception as e:
+        raise ValueError(f"日期解析錯誤: {str(e)}")
+
+def parse_time_string(time_str):
+    """解析時間格式"""
+    try:
+        # 移除空格並處理各種分隔符
+        clean_time = time_str.strip().replace(' ', '')
+        
+        # 處理冒號分隔的時間
+        if ':' in clean_time:
+            parts = clean_time.split(':')
+            hour = int(parts[0])
+            minute = int(parts[1]) if len(parts) > 1 else 0
+            return hour, minute
+        
+        # 處理4位數字時間 (HHMM)
+        if len(clean_time) == 4 and clean_time.isdigit():
+            hour = int(clean_time[:2])
+            minute = int(clean_time[2:4])
+            return hour, minute
+        
+        # 處理2位數字時間 (HH)
+        if len(clean_time) <= 2 and clean_time.isdigit():
+            hour = int(clean_time)
+            minute = 0
+            return hour, minute
+        
+        # 默認返回12:00
+        return 12, 0
+        
+    except Exception as e:
+        # 出錯時返回默認時間
+        return 12, 0
+
 def get_julian_day(year, month, day, hour, minute):
     """計算儒略日"""
-    a = (14 - month) // 12
-    y = year + 4800 - a
-    m = month + 12 * a - 3
-    jd = day + (153 * m + 2) // 5 + 365 * y + y // 4 - y // 100 + y // 400 - 32045
-    jd = jd + (hour - 12) / 24 + minute / 1440
-    return jd
+    try:
+        a = (14 - month) // 12
+        y = year + 4800 - a
+        m = month + 12 * a - 3
+        jd = day + (153 * m + 2) // 5 + 365 * y + y // 4 - y // 100 + y // 400 - 32045
+        jd = jd + (hour - 12) / 24 + minute / 1440
+        return jd
+    except Exception as e:
+        # 如果計算失敗，返回一個默認值
+        return 2451545.0  # 2000年1月1日12:00 UTC
 
 def calculate_sun_position(jd):
     """簡化的太陽位置計算"""
-    # 這是一個簡化版本，實際占星需要更精確的計算
-    n = jd - 2451545.0
-    L = (280.460 + 0.9856474 * n) % 360
-    g = math.radians((357.528 + 0.9856003 * n) % 360)
-    lambda_sun = L + 1.915 * math.sin(g) + 0.020 * math.sin(2 * g)
-    return lambda_sun % 360
+    try:
+        n = jd - 2451545.0
+        L = (280.460 + 0.9856474 * n) % 360
+        g = math.radians((357.528 + 0.9856003 * n) % 360)
+        lambda_sun = L + 1.915 * math.sin(g) + 0.020 * math.sin(2 * g)
+        return lambda_sun % 360
+    except Exception as e:
+        # 如果計算失敗，返回一個默認值
+        return 0.0
 
 def get_zodiac_sign(longitude):
     """根據經度計算星座"""
-    sign_number = int(longitude // 30) + 1
-    return sign_number
+    try:
+        longitude = longitude % 360  # 確保在0-360範圍內
+        sign_number = int(longitude // 30) + 1
+        return min(max(sign_number, 1), 12)  # 確保在1-12範圍內
+    except Exception as e:
+        return 1  # 默認返回白羊座
 
 def calculate_simple_houses(asc_lon, lat):
     """簡化的宮位計算"""
-    houses = {}
-    for i in range(1, 13):
-        house_cusp = (asc_lon + (i - 1) * 30) % 360
-        houses[i] = house_cusp
-    return houses
+    try:
+        houses = {}
+        for i in range(1, 13):
+            house_cusp = (asc_lon + (i - 1) * 30) % 360
+            houses[i] = house_cusp
+        return houses
+    except Exception as e:
+        # 返回默認宮位
+        return {i: i * 30 for i in range(1, 13)}
 
 def get_planet_house(planet_lon, houses):
     """計算行星在哪個宮位"""
-    for house_num in range(1, 13):
-        next_house = house_num + 1 if house_num < 12 else 1
-        house_start = houses[house_num]
-        house_end = houses[next_house]
-        
-        if house_start < house_end:
-            if house_start <= planet_lon < house_end:
-                return house_num
-        else:  # 跨越0度
-            if planet_lon >= house_start or planet_lon < house_end:
-                return house_num
-    return 1  # 預設回傳第一宮
+    try:
+        planet_lon = planet_lon % 360  # 確保在0-360範圍內
+        for house_num in range(1, 13):
+            next_house = house_num + 1 if house_num < 12 else 1
+            house_start = houses[house_num]
+            house_end = houses[next_house]
+            
+            if house_start < house_end:
+                if house_start <= planet_lon < house_end:
+                    return house_num
+            else:  # 跨越0度
+                if planet_lon >= house_start or planet_lon < house_end:
+                    return house_num
+        return 1  # 預設回傳第一宮
+    except Exception as e:
+        return 1  # 預設回傳第一宮
 
 def create_sample_chart(birth_date, birth_time, latitude, longitude):
     """創建一個示例占星圖（簡化版）"""
     try:
         # 解析日期時間
-        year = int(birth_date[:4])
-        month = int(birth_date[4:6])
-        day = int(birth_date[6:8])
-        hour = int(birth_time[:2])
-        minute = int(birth_time[3:5])
+        year, month, day = parse_date_string(birth_date)
+        hour, minute = parse_time_string(birth_time)
+        
+        # 驗證日期時間的有效性
+        if not (1 <= month <= 12):
+            month = 1
+        if not (1 <= day <= 31):
+            day = 1
+        if not (0 <= hour <= 23):
+            hour = 12
+        if not (0 <= minute <= 59):
+            minute = 0
         
         # 計算儒略日
         jd = get_julian_day(year, month, day, hour, minute)
@@ -268,8 +362,30 @@ def analyze_user_chart(users: List[UserInput]):
 def analyze_chart(req: ChartRequest):
     """原始的占星圖分析端點"""
     try:
+        # 清理日期字符串，移除所有非數字字符
+        clean_date = re.sub(r'[^0-9]', '', req.date)
+        
+        # 如果清理後的日期不是8位數字，嘗試從原始字符串中解析
+        if len(clean_date) != 8:
+            try:
+                # 嘗試解析不同的日期格式
+                if '/' in req.date:
+                    parts = req.date.split('/')
+                    if len(parts) == 3:
+                        if len(parts[0]) == 4:  # YYYY/MM/DD
+                            clean_date = f"{parts[0]}{parts[1].zfill(2)}{parts[2].zfill(2)}"
+                        else:  # MM/DD/YYYY
+                            clean_date = f"{parts[2]}{parts[0].zfill(2)}{parts[1].zfill(2)}"
+                elif '-' in req.date:
+                    parts = req.date.split('-')
+                    if len(parts) == 3:  # YYYY-MM-DD
+                        clean_date = f"{parts[0]}{parts[1].zfill(2)}{parts[2].zfill(2)}"
+            except:
+                # 如果解析失敗，使用默認日期
+                clean_date = "20000101"
+        
         # 使用簡化版本的計算
-        planets = create_sample_chart(req.date.replace("-", ""), req.time, req.lat, req.lon)
+        planets = create_sample_chart(clean_date, req.time, req.lat, req.lon)
         
         result = {}
         for planet_name, planet_data in planets.items():
@@ -301,4 +417,4 @@ def health_check():
     return {"status": "healthy", "service": "astrology-api"}
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8080)
