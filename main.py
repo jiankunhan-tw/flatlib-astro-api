@@ -4,6 +4,8 @@ from flatlib.datetime import Datetime
 from flatlib.geopos import GeoPos
 from flatlib.chart import Chart
 from flatlib import const
+import flatlib.ephem.ephem as ephem  # 👈 新增
+ephem._setEphemEngine('builtin')    # 👈 新增
 import traceback
 
 app = FastAPI()
