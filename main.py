@@ -9,41 +9,41 @@ import traceback
 app = FastAPI()
 
 class ChartRequest(BaseModel):
-    date: str       # 例如 '1995-04-04'
-    time: str       # 例如 '11:30'
-    lat: float      # 例如 24.968371
-    lon: float      # 例如 121.438034
-    tz: float       # 例如 8.0
+    date: str
+    time: str
+    lat: float
+    lon: float
+    tz: float
 
 @app.post("/chart")
 def analyze_chart(req: ChartRequest):
     try:
-        # Step 1: 時間與地點處理
+        # 建立時間與地點物件
         date = Datetime(req.date, req.time, req.tz)
         pos = GeoPos(req.lat, req.lon)
 
-        # Step 2: 空 chart（不預設加天體）
-        chart = Chart(date, pos, hsys=const.HOUSES_PLACIDUS, IDs=[])
+        # 這邊不設 IDs，讓 Flatlib 自動載入主要星體與點
+        chart = Chart(date, pos, hsys=const.HOUSES_PLACIDUS)
 
-        # Step 3: 安全指定要哪些星體與點
-        safe_objects = [
+        # 安全地從已載入 chart 物件中撈資料
+        target_ids = [
             const.SUN, const.MOON, const.MERCURY, const.VENUS, const.MARS,
             const.JUPITER, const.SATURN, const.URANUS, const.NEPTUNE, const.PLUTO,
             const.ASC, const.MC
         ]
 
         planets = {}
-        for pid in safe_objects:
-            try:
-                obj = chart.getObject(pid)
+        for pid in target_ids:
+            obj = chart.get(pid)
+            if obj:
                 planets[pid] = {
                     "sign": obj.sign,
                     "lon": obj.lon,
                     "house": obj.house,
                     "speed": obj.speed
                 }
-            except Exception as e:
-                planets[pid] = {"error": str(e)}
+            else:
+                planets[pid] = {"error": "not found in chart object"}
 
         return {
             "status": "success",
