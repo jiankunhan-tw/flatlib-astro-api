@@ -18,36 +18,33 @@ class ChartRequest(BaseModel):
 @app.post("/chart")
 def analyze_chart(req: ChartRequest):
     try:
-        # 建立時間與地點物件
         date = Datetime(req.date, req.time, req.tz)
         pos = GeoPos(req.lat, req.lon)
 
-        # 這邊不設 IDs，讓 Flatlib 自動載入主要星體與點
         chart = Chart(date, pos, hsys=const.HOUSES_PLACIDUS)
 
-        # 安全地從已載入 chart 物件中撈資料
-        target_ids = [
+        ids = [
             const.SUN, const.MOON, const.MERCURY, const.VENUS, const.MARS,
             const.JUPITER, const.SATURN, const.URANUS, const.NEPTUNE, const.PLUTO,
             const.ASC, const.MC
         ]
 
-        planets = {}
-        for pid in target_ids:
+        result = {}
+        for pid in ids:
             obj = chart.get(pid)
             if obj:
-                planets[pid] = {
+                result[pid] = {
                     "sign": obj.sign,
                     "lon": obj.lon,
                     "house": obj.house,
                     "speed": obj.speed
                 }
             else:
-                planets[pid] = {"error": "not found in chart object"}
+                result[pid] = {"error": f"'{pid}' not found"}
 
         return {
             "status": "success",
-            "planets": planets
+            "planets": result
         }
 
     except Exception as e:
