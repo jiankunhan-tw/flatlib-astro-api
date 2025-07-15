@@ -4,8 +4,8 @@ from flatlib.datetime import Datetime
 from flatlib.geopos import GeoPos
 from flatlib.chart import Chart
 from flatlib import const
-import flatlib.ephem.ephem as ephem  # 👈 新增
-ephem._setEphemEngine('builtin')    # 👈 新增
+import flatlib.ephem.ephem as ephem
+ephem._setEphemEngine('builtin')  # 強制使用 flatlib 內建運算，不調用 swe
 import traceback
 
 app = FastAPI()
@@ -22,7 +22,6 @@ def analyze_chart(req: ChartRequest):
     try:
         date = Datetime(req.date, req.time, req.tz)
         pos = GeoPos(req.lat, req.lon)
-
         chart = Chart(date, pos, hsys=const.HOUSES_PLACIDUS)
 
         ids = [
@@ -34,15 +33,12 @@ def analyze_chart(req: ChartRequest):
         result = {}
         for pid in ids:
             obj = chart.get(pid)
-            if obj:
-                result[pid] = {
-                    "sign": obj.sign,
-                    "lon": obj.lon,
-                    "house": obj.house,
-                    "speed": obj.speed
-                }
-            else:
-                result[pid] = {"error": f"'{pid}' not found"}
+            result[pid] = {
+                "sign": obj.sign,
+                "lon": obj.lon,
+                "house": obj.house,
+                "speed": obj.speed
+            }
 
         return {
             "status": "success",
