@@ -1,2 +1,1 @@
 flatlib==0.2.0
-pyswisseph==2.8.0
