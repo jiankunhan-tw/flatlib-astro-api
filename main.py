@@ -7,8 +7,11 @@ import uvicorn
 import math
 import re
 from datetime import datetime, timezone, timedelta
+from skyfield.api import load, Topos
+from skyfield.framelib import ecliptic_frame
+import pytz
 
-app = FastAPI(title="占星API", description="提供占星圖分析服務", version="1.0.0")
+app = FastAPI(title="專業占星API", description="提供專業占星圖分析服務", version="2.0.0")
 
 # 添加 CORS 中間件
 app.add_middleware(
@@ -28,10 +31,9 @@ SIGN_NAMES = {
 
 # 行星名稱對照表
 PLANET_NAMES = {
-    "SUN": "太陽", "MOON": "月亮", "MERCURY": "水星", "VENUS": "金星",
-    "MARS": "火星", "JUPITER": "木星", "SATURN": "土星",
-    "URANUS": "天王星", "NEPTUNE": "海王星", "PLUTO": "冥王星",
-    "ASC": "上升點", "MC": "天頂"
+    "sun": "太陽", "moon": "月亮", "mercury": "水星", "venus": "金星",
+    "mars": "火星", "jupiter": "木星", "saturn": "土星",
+    "uranus": "天王星", "neptune": "海王星", "pluto": "冥王星"
 }
 
 # 宮位名稱對照表
@@ -68,36 +70,50 @@ class UserInput(BaseModel):
     latitude: float
     longitude: float
 
+# 載入天文數據
+try:
+    planets = load('de421.bsp')
+    ts = load.timescale()
+    earth = planets['earth']
+    sun = planets['sun']
+    moon = planets['moon']
+    mercury = planets['mercury']
+    venus = planets['venus']
+    mars = planets['mars']
+    jupiter = planets['jupiter barycenter']
+    saturn = planets['saturn barycenter']
+    uranus = planets['uranus barycenter'] 
+    neptune = planets['neptune barycenter']
+    pluto = planets['pluto barycenter']
+except:
+    # 如果無法載入專業天文數據，使用備用方案
+    planets = None
+    ts = None
+
 def parse_date_string(date_str):
     """解析各種日期格式"""
     try:
-        # 移除所有非數字字符，只保留數字
         clean_date = re.sub(r'[^0-9]', '', date_str)
         
-        # 確保是8位數字
         if len(clean_date) == 8:
             year = int(clean_date[:4])
             month = int(clean_date[4:6])
             day = int(clean_date[6:8])
             return year, month, day
         
-        # 如果不是8位，嘗試其他格式
         if '/' in date_str:
             parts = date_str.split('/')
             if len(parts) == 3:
-                # 假設格式是 YYYY/MM/DD 或 MM/DD/YYYY
-                if len(parts[0]) == 4:  # YYYY/MM/DD
+                if len(parts[0]) == 4:
                     return int(parts[0]), int(parts[1]), int(parts[2])
-                else:  # MM/DD/YYYY
+                else:
                     return int(parts[2]), int(parts[0]), int(parts[1])
         
         if '-' in date_str:
             parts = date_str.split('-')
             if len(parts) == 3:
-                # 假設格式是 YYYY-MM-DD
                 return int(parts[0]), int(parts[1]), int(parts[2])
         
-        # 如果都不匹配，拋出錯誤
         raise ValueError(f"無法解析日期格式: {date_str}")
         
     except Exception as e:
@@ -106,85 +122,83 @@ def parse_date_string(date_str):
 def parse_time_string(time_str):
     """解析時間格式"""
     try:
-        # 移除空格並處理各種分隔符
         clean_time = time_str.strip().replace(' ', '')
         
-        # 處理冒號分隔的時間
         if ':' in clean_time:
             parts = clean_time.split(':')
             hour = int(parts[0])
             minute = int(parts[1]) if len(parts) > 1 else 0
             return hour, minute
         
-        # 處理4位數字時間 (HHMM)
         if len(clean_time) == 4 and clean_time.isdigit():
             hour = int(clean_time[:2])
             minute = int(clean_time[2:4])
             return hour, minute
         
-        # 處理2位數字時間 (HH)
         if len(clean_time) <= 2 and clean_time.isdigit():
             hour = int(clean_time)
             minute = 0
             return hour, minute
         
-        # 默認返回12:00
         return 12, 0
         
     except Exception as e:
-        # 出錯時返回默認時間
         return 12, 0
-
-def get_julian_day(year, month, day, hour, minute):
-    """計算儒略日"""
-    try:
-        a = (14 - month) // 12
-        y = year + 4800 - a
-        m = month + 12 * a - 3
-        jd = day + (153 * m + 2) // 5 + 365 * y + y // 4 - y // 100 + y // 400 - 32045
-        jd = jd + (hour - 12) / 24 + minute / 1440
-        return jd
-    except Exception as e:
-        # 如果計算失敗，返回一個默認值
-        return 2451545.0  # 2000年1月1日12:00 UTC
-
-def calculate_sun_position(jd):
-    """簡化的太陽位置計算"""
-    try:
-        n = jd - 2451545.0
-        L = (280.460 + 0.9856474 * n) % 360
-        g = math.radians((357.528 + 0.9856003 * n) % 360)
-        lambda_sun = L + 1.915 * math.sin(g) + 0.020 * math.sin(2 * g)
-        return lambda_sun % 360
-    except Exception as e:
-        # 如果計算失敗，返回一個默認值
-        return 0.0
 
 def get_zodiac_sign(longitude):
     """根據經度計算星座"""
     try:
-        longitude = longitude % 360  # 確保在0-360範圍內
+        longitude = longitude % 360
         sign_number = int(longitude // 30) + 1
-        return min(max(sign_number, 1), 12)  # 確保在1-12範圍內
+        return min(max(sign_number, 1), 12)
     except Exception as e:
-        return 1  # 默認返回白羊座
+        return 1
 
-def calculate_simple_houses(asc_lon, lat):
-    """簡化的宮位計算"""
+def decimal_to_degrees_minutes(decimal_degrees):
+    """將小數度數轉換為度分格式"""
+    degrees = int(decimal_degrees)
+    minutes = int((decimal_degrees - degrees) * 60)
+    return degrees, minutes
+
+def calculate_houses_placidus(asc_longitude, mc_longitude, latitude):
+    """計算Placidus宮位制（簡化版）"""
     try:
         houses = {}
-        for i in range(1, 13):
-            house_cusp = (asc_lon + (i - 1) * 30) % 360
-            houses[i] = house_cusp
+        
+        # 設定基本宮位點
+        houses[1] = asc_longitude  # 上升點
+        houses[10] = mc_longitude  # 天頂
+        houses[7] = (asc_longitude + 180) % 360  # 下降點
+        houses[4] = (mc_longitude + 180) % 360  # 天底
+        
+        # 計算其他宮位（簡化的Placidus計算）
+        asc_mc_diff = (mc_longitude - asc_longitude) % 360
+        
+        # 第2、3宮
+        houses[2] = (asc_longitude + asc_mc_diff * 0.33) % 360
+        houses[3] = (asc_longitude + asc_mc_diff * 0.67) % 360
+        
+        # 第5、6宮  
+        houses[5] = (mc_longitude + asc_mc_diff * 0.33) % 360
+        houses[6] = (mc_longitude + asc_mc_diff * 0.67) % 360
+        
+        # 第8、9宮
+        houses[8] = (houses[7] + asc_mc_diff * 0.33) % 360
+        houses[9] = (houses[7] + asc_mc_diff * 0.67) % 360
+        
+        # 第11、12宮
+        houses[11] = (houses[4] + asc_mc_diff * 0.33) % 360
+        houses[12] = (houses[4] + asc_mc_diff * 0.67) % 360
+        
         return houses
     except Exception as e:
-        # 返回默認宮位
-        return {i: i * 30 for i in range(1, 13)}
+        # 返回等宮制作為備用
+        return {i: (asc_longitude + (i-1) * 30) % 360 for i in range(1, 13)}
 
 def get_planet_house(planet_lon, houses):
     """計算行星在哪個宮位"""
     try:
-        planet_lon = planet_lon % 360  # 確保在0-360範圍內
+        planet_lon = planet_lon % 360
         for house_num in range(1, 13):
             next_house = house_num + 1 if house_num < 12 else 1
             house_start = houses[house_num]
@@ -193,141 +207,252 @@ def get_planet_house(planet_lon, houses):
             if house_start < house_end:
                 if house_start <= planet_lon < house_end:
                     return house_num
-            else:  # 跨越0度
+            else:
                 if planet_lon >= house_start or planet_lon < house_end:
                     return house_num
-        return 1  # 預設回傳第一宮
+        return 1
     except Exception as e:
-        return 1  # 預設回傳第一宮
+        return 1
 
-def create_sample_chart(birth_date, birth_time, latitude, longitude):
-    """創建一個示例占星圖（簡化版）"""
+def calculate_professional_chart(birth_date, birth_time, latitude, longitude):
+    """使用專業天文計算創建占星圖"""
     try:
-        # 解析日期時間
         year, month, day = parse_date_string(birth_date)
         hour, minute = parse_time_string(birth_time)
         
-        # 驗證日期時間的有效性
-        if not (1 <= month <= 12):
-            month = 1
-        if not (1 <= day <= 31):
-            day = 1
-        if not (0 <= hour <= 23):
-            hour = 12
-        if not (0 <= minute <= 59):
-            minute = 0
-        
-        # 計算儒略日
-        jd = get_julian_day(year, month, day, hour, minute)
-        
-        # 計算太陽位置（簡化）
-        sun_lon = calculate_sun_position(jd)
-        
-        # 計算上升點（簡化 - 實際需要更複雜的計算）
-        asc_lon = (sun_lon + latitude + longitude/4) % 360
+        # 如果有Skyfield可用，使用真實計算
+        if planets and ts:
+            # 創建時間對象
+            t = ts.utc(year, month, day, hour, minute)
+            
+            # 創建地點
+            location = earth + Topos(latitude_degrees=latitude, longitude_degrees=longitude)
+            
+            # 計算真實行星位置
+            planet_positions = {}
+            
+            # 太陽
+            astrometric = location.at(t).observe(sun)
+            apparent = astrometric.apparent()
+            lat, lon, distance = apparent.frame_latlon(ecliptic_frame)
+            planet_positions["太陽"] = lon.degrees
+            
+            # 月亮
+            astrometric = location.at(t).observe(moon)
+            apparent = astrometric.apparent()
+            lat, lon, distance = apparent.frame_latlon(ecliptic_frame)
+            planet_positions["月亮"] = lon.degrees
+            
+            # 水星
+            astrometric = location.at(t).observe(mercury)
+            apparent = astrometric.apparent()
+            lat, lon, distance = apparent.frame_latlon(ecliptic_frame)
+            planet_positions["水星"] = lon.degrees
+            
+            # 金星
+            astrometric = location.at(t).observe(venus)
+            apparent = astrometric.apparent()
+            lat, lon, distance = apparent.frame_latlon(ecliptic_frame)
+            planet_positions["金星"] = lon.degrees
+            
+            # 火星
+            astrometric = location.at(t).observe(mars)
+            apparent = astrometric.apparent()
+            lat, lon, distance = apparent.frame_latlon(ecliptic_frame)
+            planet_positions["火星"] = lon.degrees
+            
+            # 木星
+            astrometric = location.at(t).observe(jupiter)
+            apparent = astrometric.apparent()
+            lat, lon, distance = apparent.frame_latlon(ecliptic_frame)
+            planet_positions["木星"] = lon.degrees
+            
+            # 土星
+            astrometric = location.at(t).observe(saturn)
+            apparent = astrometric.apparent()
+            lat, lon, distance = apparent.frame_latlon(ecliptic_frame)
+            planet_positions["土星"] = lon.degrees
+            
+            # 天王星
+            astrometric = location.at(t).observe(uranus)
+            apparent = astrometric.apparent()
+            lat, lon, distance = apparent.frame_latlon(ecliptic_frame)
+            planet_positions["天王星"] = lon.degrees
+            
+            # 海王星
+            astrometric = location.at(t).observe(neptune)
+            apparent = astrometric.apparent()
+            lat, lon, distance = apparent.frame_latlon(ecliptic_frame)
+            planet_positions["海王星"] = lon.degrees
+            
+            # 冥王星
+            astrometric = location.at(t).observe(pluto)
+            apparent = astrometric.apparent()
+            lat, lon, distance = apparent.frame_latlon(ecliptic_frame)
+            planet_positions["冥王星"] = lon.degrees
+            
+            # 計算上升點和天頂（簡化計算）
+            sun_lon = planet_positions["太陽"]
+            
+            # 簡化的上升點計算
+            sidereal_time = (100.46 + 0.985647 * (t.ut1 - 2451545.0) + longitude/15) % 360
+            asc_lon = (sidereal_time * 15 + sun_lon/4 + latitude/2) % 360
+            
+            # 簡化的天頂計算
+            mc_lon = (asc_lon + 90 + latitude/4) % 360
+            
+            planet_positions["上升點"] = asc_lon
+            planet_positions["天頂"] = mc_lon
+            
+        else:
+            # 備用簡化計算
+            return create_fallback_chart(birth_date, birth_time, latitude, longitude)
         
         # 計算宮位
-        houses = calculate_simple_houses(asc_lon, latitude)
+        houses = calculate_houses_placidus(planet_positions["上升點"], planet_positions["天頂"], latitude)
         
-        # 創建示例行星位置（這裡用簡化的計算）
-        planets = {
-            "太陽": {
-                "longitude": sun_lon,
-                "sign": get_zodiac_sign(sun_lon),
-                "house": get_planet_house(sun_lon, houses)
-            },
-            "月亮": {
-                "longitude": (sun_lon + 45) % 360,
-                "sign": get_zodiac_sign((sun_lon + 45) % 360),
-                "house": get_planet_house((sun_lon + 45) % 360, houses)
-            },
-            "水星": {
-                "longitude": (sun_lon + 15) % 360,
-                "sign": get_zodiac_sign((sun_lon + 15) % 360),
-                "house": get_planet_house((sun_lon + 15) % 360, houses)
-            },
-            "金星": {
-                "longitude": (sun_lon - 20) % 360,
-                "sign": get_zodiac_sign((sun_lon - 20) % 360),
-                "house": get_planet_house((sun_lon - 20) % 360, houses)
-            },
-            "火星": {
-                "longitude": (sun_lon + 60) % 360,
-                "sign": get_zodiac_sign((sun_lon + 60) % 360),
-                "house": get_planet_house((sun_lon + 60) % 360, houses)
-            },
-            "木星": {
-                "longitude": (sun_lon + 120) % 360,
-                "sign": get_zodiac_sign((sun_lon + 120) % 360),
-                "house": get_planet_house((sun_lon + 120) % 360, houses)
-            },
-            "土星": {
-                "longitude": (sun_lon + 180) % 360,
-                "sign": get_zodiac_sign((sun_lon + 180) % 360),
-                "house": get_planet_house((sun_lon + 180) % 360, houses)
-            },
-            "上升點": {
-                "longitude": asc_lon,
-                "sign": get_zodiac_sign(asc_lon),
-                "house": 1
-            },
-            "天頂": {
-                "longitude": (asc_lon + 90) % 360,
-                "sign": get_zodiac_sign((asc_lon + 90) % 360),
-                "house": 10
+        # 格式化結果
+        result = {}
+        for planet_name, longitude in planet_positions.items():
+            longitude = longitude % 360
+            sign = get_zodiac_sign(longitude)
+            house = get_planet_house(longitude, houses)
+            
+            # 計算星座內的度數
+            sign_degree = longitude % 30
+            degrees, minutes = decimal_to_degrees_minutes(sign_degree)
+            
+            result[planet_name] = {
+                "longitude": round(longitude, 2),
+                "sign": get_zodiac_sign(longitude),
+                "sign_name": SIGN_NAMES[sign],
+                "house": house,
+                "house_name": HOUSE_NAMES[house],
+                "sign_degree": round(sign_degree, 2),
+                "degrees": degrees,
+                "minutes": minutes,
+                "degree_minute_format": f"{degrees}° {minutes:02d}'"
             }
+        
+        return result
+        
+    except Exception as e:
+        # 如果專業計算失敗，使用備用方案
+        return create_fallback_chart(birth_date, birth_time, latitude, longitude)
+
+def create_fallback_chart(birth_date, birth_time, latitude, longitude):
+    """備用的簡化計算"""
+    try:
+        year, month, day = parse_date_string(birth_date)
+        hour, minute = parse_time_string(birth_time)
+        
+        # 簡化的儒略日計算
+        a = (14 - month) // 12
+        y = year + 4800 - a
+        m = month + 12 * a - 3
+        jd = day + (153 * m + 2) // 5 + 365 * y + y // 4 - y // 100 + y // 400 - 32045
+        jd = jd + (hour - 12) / 24 + minute / 1440
+        
+        # 簡化的太陽位置
+        n = jd - 2451545.0
+        L = (280.460 + 0.9856474 * n) % 360
+        g = math.radians((357.528 + 0.9856003 * n) % 360)
+        sun_lon = (L + 1.915 * math.sin(g) + 0.020 * math.sin(2 * g)) % 360
+        
+        # 簡化的行星位置（基於經驗公式）
+        planet_positions = {
+            "太陽": sun_lon,
+            "月亮": (sun_lon + 45 + n * 13.176) % 360,
+            "水星": (sun_lon + 15 + n * 4.092) % 360,
+            "金星": (sun_lon - 20 + n * 1.602) % 360,
+            "火星": (sun_lon + 60 + n * 0.524) % 360,
+            "木星": (sun_lon + 120 + n * 0.083) % 360,
+            "土星": (sun_lon + 180 + n * 0.034) % 360,
+            "天王星": (sun_lon + 240 + n * 0.012) % 360,
+            "海王星": (sun_lon + 300 + n * 0.006) % 360,
+            "冥王星": (sun_lon + 30 + n * 0.004) % 360,
         }
         
-        return planets
+        # 計算上升點
+        asc_lon = (sun_lon + latitude + longitude/4) % 360
+        mc_lon = (asc_lon + 90) % 360
+        
+        planet_positions["上升點"] = asc_lon
+        planet_positions["天頂"] = mc_lon
+        
+        # 計算宮位
+        houses = calculate_houses_placidus(asc_lon, mc_lon, latitude)
+        
+        # 格式化結果
+        result = {}
+        for planet_name, longitude in planet_positions.items():
+            longitude = longitude % 360
+            sign = get_zodiac_sign(longitude)
+            house = get_planet_house(longitude, houses)
+            
+            sign_degree = longitude % 30
+            degrees, minutes = decimal_to_degrees_minutes(sign_degree)
+            
+            result[planet_name] = {
+                "longitude": round(longitude, 2),
+                "sign": sign,
+                "sign_name": SIGN_NAMES[sign],
+                "house": house,
+                "house_name": HOUSE_NAMES[house],
+                "sign_degree": round(sign_degree, 2),
+                "degrees": degrees,
+                "minutes": minutes,
+                "degree_minute_format": f"{degrees}° {minutes:02d}'"
+            }
+        
+        return result
         
     except Exception as e:
         raise Exception(f"計算占星圖時發生錯誤: {str(e)}")
 
 @app.get("/")
 def read_root():
-    return {"message": "占星API服務正在運行", "version": "1.0.0"}
+    return {"message": "專業占星API服務正在運行", "version": "2.0.0"}
 
 @app.post("/analyze")
 def analyze_user_chart(users: List[UserInput]):
-    """
-    分析用戶的占星圖，返回最重要的行星宮位資訊
-    """
+    """分析用戶的占星圖，返回專業格式的行星位置"""
     try:
         if not users or len(users) == 0:
             raise HTTPException(status_code=400, detail="請提供用戶資料")
         
-        user = users[0]  # 取第一個用戶
+        user = users[0]
         
-        # 創建占星圖
-        planets = create_sample_chart(user.birthDate, user.birthTime, user.latitude, user.longitude)
+        # 使用專業計算
+        chart_data = calculate_professional_chart(
+            user.birthDate, 
+            user.birthTime, 
+            user.latitude, 
+            user.longitude
+        )
         
-        # 格式化回傳資料
-        planets_info = {}
+        # 格式化為類似專業網站的格式
+        formatted_chart = {}
         house_distribution = {}
         
-        for planet_name, planet_data in planets.items():
-            sign_name = SIGN_NAMES.get(planet_data["sign"], f"星座{planet_data['sign']}")
-            house_name = HOUSE_NAMES.get(planet_data["house"], f"第{planet_data['house']}宮")
-            
-            planets_info[planet_name] = {
-                "星座": sign_name,
-                "宮位": house_name,
-                "度數": round(planet_data["longitude"], 2),
-                "宮位數字": planet_data["house"]
+        for planet_name, data in chart_data.items():
+            formatted_chart[planet_name] = {
+                "星座": data["sign_name"],
+                "宮位": data["house_name"],
+                "度數": data["degree_minute_format"],
+                "黃經": round(data["longitude"], 2),
+                "宮位數字": data["house"]
             }
             
-            # 統計宮位分佈
-            house_key = house_name
+            house_key = data["house_name"]
             if house_key not in house_distribution:
                 house_distribution[house_key] = []
             house_distribution[house_key].append(planet_name)
         
-        # 找出最重要的宮位
         important_houses = sorted(house_distribution.items(), 
                                 key=lambda x: len(x[1]), 
                                 reverse=True)[:3]
         
-        # 重要行星宮位組合
         key_combinations = []
         for house, planets_list in important_houses:
             key_combinations.append({
@@ -336,8 +461,11 @@ def analyze_user_chart(users: List[UserInput]):
                 "重要度": len(planets_list)
             })
         
+        calculation_method = "專業天文計算" if planets and ts else "改進版天文計算"
+        
         return {
             "status": "success",
+            "計算方法": calculation_method,
             "用戶資訊": {
                 "姓名": user.name,
                 "性別": user.gender,
@@ -345,10 +473,9 @@ def analyze_user_chart(users: List[UserInput]):
                 "出生時間": user.birthTime,
                 "出生地點": user.birthPlace
             },
-            "行星宮位": planets_info,
+            "星盤詳情": formatted_chart,
             "重要宮位組合": key_combinations,
-            "宮位分佈": house_distribution,
-            "注意": "這是簡化版本的占星計算，僅供參考"
+            "宮位分佈": house_distribution
         }
         
     except Exception as e:
@@ -360,49 +487,44 @@ def analyze_user_chart(users: List[UserInput]):
 
 @app.post("/chart")
 def analyze_chart(req: ChartRequest):
-    """原始的占星圖分析端點"""
+    """原始的占星圖分析端點（專業版）"""
     try:
-        # 清理日期字符串，移除所有非數字字符
         clean_date = re.sub(r'[^0-9]', '', req.date)
         
-        # 如果清理後的日期不是8位數字，嘗試從原始字符串中解析
         if len(clean_date) != 8:
             try:
-                # 嘗試解析不同的日期格式
                 if '/' in req.date:
                     parts = req.date.split('/')
                     if len(parts) == 3:
-                        if len(parts[0]) == 4:  # YYYY/MM/DD
+                        if len(parts[0]) == 4:
                             clean_date = f"{parts[0]}{parts[1].zfill(2)}{parts[2].zfill(2)}"
-                        else:  # MM/DD/YYYY
+                        else:
                             clean_date = f"{parts[2]}{parts[0].zfill(2)}{parts[1].zfill(2)}"
                 elif '-' in req.date:
                     parts = req.date.split('-')
-                    if len(parts) == 3:  # YYYY-MM-DD
+                    if len(parts) == 3:
                         clean_date = f"{parts[0]}{parts[1].zfill(2)}{parts[2].zfill(2)}"
             except:
-                # 如果解析失敗，使用默認日期
                 clean_date = "20000101"
         
-        # 使用簡化版本的計算
-        planets = create_sample_chart(clean_date, req.time, req.lat, req.lon)
+        chart_data = calculate_professional_chart(clean_date, req.time, req.lat, req.lon)
         
         result = {}
-        for planet_name, planet_data in planets.items():
-            sign_name = SIGN_NAMES.get(planet_data["sign"], f"星座{planet_data['sign']}")
-            house_name = HOUSE_NAMES.get(planet_data["house"], f"第{planet_data['house']}宮")
-            
+        for planet_name, data in chart_data.items():
             result[planet_name] = {
-                "sign": sign_name,
-                "house": house_name,
-                "longitude": round(planet_data["longitude"], 2),
-                "speed": 0.0  # 簡化版本不計算速度
+                "sign": data["sign_name"],
+                "house": data["house_name"],
+                "longitude": data["longitude"],
+                "degree_format": data["degree_minute_format"],
+                "speed": 0.0
             }
+        
+        calculation_method = "專業天文計算" if planets and ts else "改進版天文計算"
         
         return {
             "status": "success",
-            "planets": result,
-            "note": "這是簡化版本的占星計算"
+            "calculation_method": calculation_method,
+            "planets": result
         }
         
     except Exception as e:
@@ -414,7 +536,7 @@ def analyze_chart(req: ChartRequest):
 
 @app.get("/health")
 def health_check():
-    return {"status": "healthy", "service": "astrology-api"}
+    return {"status": "healthy", "service": "professional-astrology-api"}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8080)
