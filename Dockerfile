@@ -1,9 +1,18 @@
-FROM python:3.10-slim
+FROM python:3.11-slim
 
-# 確保安裝 pip、uvicorn、flatlib
 WORKDIR /app
-COPY . /app
+
+# 複製 requirements.txt
+COPY requirements.txt .
+
+# 安裝 Python 依賴
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 啟動 FastAPI（main.py 中的 app）
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+# 複製應用程式代碼
+COPY . .
+
+# 暴露端口
+EXPOSE 8000
+
+# 啟動應用程式
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
